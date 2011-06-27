@@ -1,0 +1,120 @@
+Javascript code in the package?
+===============================
+
+<therve> 12:17:26> jml, should the javascript code reside in the same project btw?
+...
+<jml> therve: I'm not sure. What's the purpose & function of the JS code?
+<therve> jml, it contains the logic to maintain the long-polling connections
+<jml> therve: that *sounds* like it would be useful to be in there, but I'm really not informed or familiar enough to make a call. What do you think?
+--> smethia (samir@19F698F0.3EE626CE.96F3C2F7.IP) has joined #landscape
+<_mup_> landscape/synchronise-licences r2938 committed by kevin@canonical.com
+ Synchronise now removes unknown licences.
+<therve> jml, the main concern I have is about running the tests
+<therve> adding such an infrastructure to a project is painful
+<jml> therve: ahh, I see.
+ therve: otoh, being self-contained is pretty useful.
+ therve: is it a short-term pain / long-term gain thing?
+ we're going to need some kind of test running infrastructure anyway
+<therve> kind of. The pain is somewhat there all the time :)
+<jml> therve: well, yeah, software
+<free> jml, therve: the js part is pretty much YUI-integration of the project, in principle there could be a jQuery-integration for it, we can surely put all of them in the same tree, however for the YUI part it'd be nice to have it in the gallery, also for greater exposure to the public
+<therve> jml, I mean, our current solution in Landscape involves nodejs
+<free> it'd be nice to have it in the YUI gallery *too*, that is
+<therve> free, I'm not sure how generic it is
+ also the current code is not awesome :)
+ and depend on the Deferred implementation
+<free> therve: I mean, the backend code can run with any js frontend
+ therve: sure, deferred should be in the gallery btw
+ therve: what I mean is that what we have works with YUI, but there could be similar code for jQuery, say
+<therve> yeah, I'm not going to write it though.
+<free> therve: essentially I'd like the project to be a way to enable python web up to have notifications and jobs
+ therve: sure
+<jml> well, we're YUI anyway
+<free> therve: the frontend is somehow orthogonal
+ s/web up/web apps/.
+<therve> free, the thing is I don't see what we gain from it being in the gallery, except "it's nice"
+<free> therve: some exposure, I'd say, but it can be a sync to the launchpad project, I don't really care
+<jml> therve: also, uhh, where does the JS code actually *live*?
+<free> therve: btw which code specifically it's not awsome?
+<free> jml: c.l.javascript.deferred and c.l.javascript.datasource
+<therve> jml, canonical/landscape/javascript/datasource mainly
+<therve> free, the datasource code
+<jml> and, tbh, I'm a bit confused, it sounded like "maybe don't include JS code because it's hard to set up the test infrastructure"
+ and now you're talking about YUI, jQuery and the gallery
+<free> therve: it's not too bad I'd say
+<therve> jml, the gallery is somewhat a way to delegate the testing outside :)
+<jml> therve: so, split off more than one component...
+ therve: that sounds like too much work to do at once.
+<free> therve: btw, I was eventually thinking to move that to http://yuilibrary.com/gallery/show/eventsource, that will transparently use EventSource on browsers that have it (Chrome) and fall back to HTTP streaming to the ones that don't (FF), in both cases it should reduce the polling overhead
+ therve: I mean use Y.EventSource for implementing PageDataSource, and change the server side accordingly, it should be easy
+<therve> jml, maybe
+<jml> therve:  ok.
+<jml> therve: basically, I'm no closer to knowing what to do.
+ thedac therve
+<therve> jml, sorry
+<free> jml: are you at the platform rally?
+<jml> therve: that's ok. sometimes the world is inherently confusing
+ free: yes.
+<free> jml: I'm coming there tomorrow night, we can discuss about this if you wish
+
+
+Porting the daemons
+===================
+
+<jml> async-frontend, job-handler, pingserver
+<jml> should we move those over?
+<free> jml: the tac files?
+<jml> free: I guess, yes.
+<free> jml: async-frontend and joh-handler, yes, pingserver it's Landscape specific
+<bigjools> free: async-frontend looks LS specific
+<jml> free: can you give us a hand de-landscapifying them?
+<bigjools> as does job-handler
+<free> jml: sure
+<jml> free: now?
+<free> bigjools, jml: they are probably coupled to Landscape, but they shouldn't, in principle
+<free> jml: I can have quick look now of what would be needed
+ jml: but I guess not help doing the actual work
+<jml> free: thank you. even that would be a good help for us.
+<free> jml: just to understand, you are aiming at having the ball rolling as quick as possible?
+<jml> free: yes.
+<free> jml: ok
+<jml> free: we want something up-and-running end-to-end with a Launchpad page as quickly as possible
+<free> jml: so I assume canonical.amqp doesn't import anything from canonical.landscape (or other canonical.xxx modules), I didn't verify though, please check that first
+ jml: then for the tac files..
+ jml: job-hanlder imports from canonical.landscape.scripts, the quickest thing to do is probably cut & paste, it might turn out that you don't really need those wrappers and you can go with plain twisted machinery, I'm not sure
+<jml> free: only crappy stuff c.l.testing.twist
+<free> jml: then there's load_config from canonical.landscape.application, that is essentially to load the zcml configuration, for 1) the amqp connection details 2) the db/storm details
+<free> jml: if you can go without that, I'm happy, I don't know the details but I suspect it was for working around bugs that were solved (my guess)
+<jml> free: what about all the env vars & literals?
+<free> jml: where?
+ jml: oh
+ jml: that's for choosing the config file to load
+<free> jml: if you're not in such a terrible rush and have some time, it'd be good to go with a config mechanism that doesn't require zcml, things will be simpler
+<jml> free: +1
+<free> jml: it should probably have a hook to load application-specific configuration in the job-handler process, like the db connections
+ jml: that's all is needed I think
+ jml: an .ini file would be enough for the AMQP broker connection
+<jml> free: what about the literal 'landscape' passed to JobHandler?
+<sidnei> jml, that's a prefix for the queue names iirc
+<free> jml: that should be configurable, it's just the prefix
+ jml: what sidnei says
+<jml> ok, thanks.
+<free> jml: the other bit is from canonical.landscape.model.job.registry import get_handlers
+<free> jml: if we had time that'd deserve more care
+<free> jml: because lots of that has grown to be general enough to be extracted and included in the standalone project, I believe
+<jml> free: that'd be cool.
+<free> jml: but you can also go without it for now
+ jml: I've been meaning to do that for a while, fwiw
+<jml> free: once we've got the standalone project, I reckon it'll be to both projects' benefits to factor stuff into it
+ free: but, let's get it working first
+<free> jml: JobHandler(threadpool, get_handlers(), "landscape"), the get_handlers() just gets you a dictionary of job names to callables
+ jml: sure
+<free> jml: look at canonical.amqp.job.handler line 80 and after
+<andreas> sidnei: is txstatsd a case where we will have our own trunk (landscape's) and upstream?
+<free> jml: a dictionary of job names to callables is bare minimum required, but in practice you want to have some base Job class, so we should offer that facility, maybe as optional
+ jml: also we'd like the ability to aggregate jobs so, a JobSet would be nice too
+<free> jml: that's all for the future, you can get the ball rolling using the handlers dictionary, I'd say
+<jml> free: rockin'. thanks.
+<free> jml: I think that's all for the job handler
+<free> jml: for async-frontend the same applies, it's probably even simpler
+<free> jml: it doesn't even need authentication, as it's implicit in the page_key concept (if you read the spec)

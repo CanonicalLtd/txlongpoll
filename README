@@ -4,10 +4,7 @@ Generic long poll server used by Launchpad and Landscape.
 Building
 --------
 
-Grab the latest storm egg from Launchpad, put it in download-cache/dist.
-lazr.amqp needs storm.twisted, which is only in trunk.
-
-It also needs a recent RabbitMQ with support for rejection. Maverick's
+lazr.amqp needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
 
  $ python bootstrap.py

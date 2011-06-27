@@ -77,7 +77,6 @@ class JobHandlerTest(AMQTest):
         yield event_queue.get()
 
         self.assertTrue("arg1" in self.calls[0].keys())
-        self.assertTrue("transactor" in self.calls[0].keys())
         self.assertTrue(1 in self.calls[0].values())
         self.assertEquals(self.responses, [])
 
@@ -121,7 +120,6 @@ class JobHandlerTest(AMQTest):
         yield event_queue.get()
 
         self.assertTrue("arg1" in self.calls[0].keys())
-        self.assertTrue("transactor" in self.calls[0].keys())
         self.assertTrue(u"foo" in self.calls[0].values())
         self.assertTrue(isinstance(self.calls[0]["empty"], unicode))
         self.assertTrue(isinstance(self.calls[0]["arg1"], unicode))
@@ -158,7 +156,6 @@ class JobHandlerTest(AMQTest):
         yield event_queue.get()
 
         self.assertTrue("arg1" in self.calls[0].keys())
-        self.assertTrue("transactor" in self.calls[0].keys())
         self.assertTrue(1 in self.calls[0].values())
         self.assertEquals(self.responses, [])
 
@@ -285,7 +282,6 @@ class JobHandlerTest(AMQTest):
         yield event_queue.get()
 
         self.assertTrue("arg2" in calls[0].keys())
-        self.assertTrue("transactor" in calls[0].keys())
         self.assertTrue(u"foo" in calls[0].values())
 
         reply = yield self.channel.basic_consume(
@@ -327,7 +323,6 @@ class JobHandlerTest(AMQTest):
         yield event_queue.get()
 
         self.assertTrue("arg1" in self.calls[0].keys())
-        self.assertTrue("transactor" in self.calls[0].keys())
         self.assertTrue(1 in self.calls[0].values())
         self.assertEquals(self.responses, [])
 
