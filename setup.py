@@ -26,6 +26,11 @@ setup(
     include_package_data=True,
     zip_safe=False,
     description='Magic.',
+    entry_points=dict(
+        console_scripts=[
+            'twistd = twisted.scripts.twistd:run',
+        ]
+    ),
     install_requires=[
         'storm',
         'transaction',
