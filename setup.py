@@ -27,7 +27,10 @@ setup(
     zip_safe=False,
     description='Magic.',
     install_requires=[
+        'amqplib',
+        'fixtures',
         'storm',
+        'testtools',
         'transaction',
         'twisted',
         'txamqp',
