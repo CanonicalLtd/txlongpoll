@@ -32,7 +32,6 @@ setup(
         ]
     ),
     install_requires=[
-        'storm',
         'transaction',
         'twisted',
         'txamqp',

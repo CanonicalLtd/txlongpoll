@@ -9,8 +9,6 @@ import json
 from twisted.internet.defer import inlineCallbacks, maybeDeferred
 from twisted.python import log
 
-from storm.twisted.transact import Transactor
-
 from lazr.amqp.notify.publisher import NotificationPublisher
 
 
@@ -83,7 +81,6 @@ class JobHandler(object):
             else:
                 kwargs = dict(
                     (str(key), value) for key, value in payload.items())
-                kwargs["transactor"] = Transactor(self._threadpool)
                 deferred = maybeDeferred(handler, **kwargs)
                 deferred.addCallback(
                     self._handle_result, uuid, action, namespace)
