@@ -27,9 +27,9 @@ class QueueWrapper(object):
 
 class AMQTest(TwistedTestCase):
 
-    VHOST = "landscape-test"
-    USER = "landscape"
-    PASSWORD = "landscape"
+    VHOST = "lazr.amqp-test"
+    USER = "lazr.amqp"
+    PASSWORD = "lazr.amqp"
 
     def setUp(self):
         """

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+function set_users_rabbitmq {
+    sudo rabbitmqctl add_user lazr.amqp lazr.amqp
+    sudo rabbitmqctl add_vhost lazr.amqp-test
+}
+
+
+function set_perms_rabbitmq {
+    sudo rabbitmqctl set_permissions -p lazr.amqp-test lazr.amqp ".*" ".*" ".*"
+}
+
+
+function configure_rabbitmq {
+    echo "RabbitMQ Setup:"
+    set_users_rabbitmq
+    set_perms_rabbitmq
+    echo
+}
+
+
+configure_rabbitmq

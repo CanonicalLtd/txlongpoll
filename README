@@ -17,7 +17,8 @@ It also needs a recent RabbitMQ with support for rejection. Maverick's
 Testing
 -------
 
-The test suite needs the system RabbitMQ set up in the Landscape dev
-config. dev/landscape-rabbitmq-setup from lp:landscape will do that.
+The test suite needs some users and vhosts on the system RabbitMQ
+instance.
 
+ $ ./rabbitmq-test-setup
  $ bin/test
