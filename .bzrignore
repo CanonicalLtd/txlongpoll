@@ -4,7 +4,7 @@ _trial_temp
 bin
 build
 develop-eggs
-download-cache/dist
+download-cache
 eggs
 lazr.amqp.egg-info
 parts
