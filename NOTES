@@ -10,17 +10,13 @@ Javascript code in the package?
 <_mup_> landscape/synchronise-licences r2938 committed by kevin@canonical.com
  Synchronise now removes unknown licences.
 <therve> jml, the main concern I have is about running the tests
-<Beret> hi all
 <therve> adding such an infrastructure to a project is painful
- hi Beret!
 <jml> therve: ahh, I see.
  therve: otoh, being self-contained is pretty useful.
  therve: is it a short-term pain / long-term gain thing?
  we're going to need some kind of test running infrastructure anyway
 <therve> kind of. The pain is somewhat there all the time :)
- thedac therve
 <jml> therve: well, yeah, software
---> bigjools (quassel@FCF1EA14.7424957.4A0CA913.IP) has joined #landscape
 <free> jml, therve: the js part is pretty much YUI-integration of the project, in principle there could be a jQuery-integration for it, we can surely put all of them in the same tree, however for the YUI part it'd be nice to have it in the gallery, also for greater exposure to the public
 <therve> jml, I mean, our current solution in Landscape involves nodejs
 <free> it'd be nice to have it in the YUI gallery *too*, that is
@@ -52,19 +48,10 @@ Javascript code in the package?
 <free> therve: btw, I was eventually thinking to move that to http://yuilibrary.com/gallery/show/eventsource, that will transparently use EventSource on browsers that have it (Chrome) and fall back to HTTP streaming to the ones that don't (FF), in both cases it should reduce the polling overhead
  therve: I mean use Y.EventSource for implementing PageDataSource, and change the server side accordingly, it should be easy
 <therve> jml, maybe
---> Roberto (roberto@canonical-cloaked-6EA2FADB.dyn.optonline.net) has joined #landscape
 <jml> therve:  ok.
-<Beret> http://www.google.com/calendar/hosted/canonical.com/embed?src=canonical.com_7fkn23g7d0u0v5a6srf3oelaho%40group.calendar.google.com&ctz=America/Chicago&pvttk=d12c91767e6acda49d8b95655541a70d
-<-- negronjl has quit (Ping timeout)
-<andreas> so we need a graphite {production,staging,trunk} set of branches?
 <jml> therve: basically, I'm no closer to knowing what to do.
  thedac therve
-<free> Beret: mornin!
- Beret: nice calendar
 <therve> jml, sorry
-<Beret> heh
- thanks
- thedac therve
 <free> jml: are you at the platform rally?
 <jml> therve: that's ok. sometimes the world is inherently confusing
  free: yes.
@@ -77,70 +64,31 @@ Porting the daemons
 <jml> async-frontend, job-handler, pingserver
 <jml> should we move those over?
 <free> jml: the tac files?
-* andreas stops the merge and starts again
-<sidnei> andreas, no, it will be needed for the deployment
-<andreas> sidnei: ok, we need to update the wiki
- sidnei: and get standalone packages for it
-<sidnei> andreas, yup
-<andreas> sidnei: what is its lp branch? lp:~landscape/txstatsd/trunk or something?
-<sidnei> andreas, lp:txtstatsd for now
-<andreas> sidnei: and the corresponding staging branch? And production?
-<sidnei> andreas, those don't exist yet. i'll just push a copy of lp:txstatsd to them.
-<andreas> sidnei: ok, thanks. And what about graphite trunk,staging,production? These are not for deployment yet?
-<sidnei> andreas, correct, not for deployment yet.
-<andreas> sidnei: so you will commit something to make "make build" not try to fetch it, or should I just ignore it?
- actually, I can't, it tries, so I can just create local branches for those
-<sidnei> andreas, i'll push the branches as i said above
-<andreas> ok
- sidnei: how are tests run in txstatsd?
-<_mup_> Bug #802536 was filed: Package txstatsd <Landscape Server:New> < https://launchpad.net/bugs/802536 >
-<therve> sidnei, yeah not call graphite-build on build
-<sidnei> andreas, 'trial txstatsd' should do it
- therve, but ./dev/advicedog expects graphite-build to have been run now
-<therve> yeah it's not tests
 <jml> free: I guess, yes.
 <free> jml: async-frontend and joh-handler, yes, pingserver it's Landscape specific
---> rvba (rvba@FCF1EA14.7424957.4A0CA913.IP) has joined #landscape
-<andreas> sidnei: are these missing modules in a package I don't have installed, or elsewhere in the landscape tree, so I need to set PYTHONPATH? https://pastebin.canonical.com/49047/
 <bigjools> free: async-frontend looks LS specific
 <jml> free: can you give us a hand de-landscapifying them?
 <bigjools> as does job-handler
 <free> jml: sure
-<sidnei> andreas, mocker is python-mocker
 <jml> free: now?
-<sidnei> andreas, the other exception should be fixed in trunk, pull or update
 <free> bigjools, jml: they are probably coupled to Landscape, but they shouldn't, in principle
-<andreas> sidnei: hmm, I don't see a python-mocker in my repositories in lucid :(
 <free> jml: I can have quick look now of what would be needed
  jml: but I guess not help doing the actual work
 <jml> free: thank you. even that would be a good help for us.
-<sidnei> andreas, how do you handle landscape? do you use a mocker branch in pythonpath?
-<andreas> not really
- it "just works"
 <free> jml: just to understand, you are aiming at having the ball rolling as quick as possible?
 <jml> free: yes.
 <free> jml: ok
 <jml> free: we want something up-and-running end-to-end with a Launchpad page as quickly as possible
-<sidnei> andreas, ah, there's a copy in canonical.testing which we use
-<andreas> sidnei: canonical/testing/mocker.py? in landscape source tree
- sidnei: do you have a separate package?
-<sidnei> andreas, yes, python-mocker is in maverick and upwards. you could take the maverick package maybe?
 <free> jml: so I assume canonical.amqp doesn't import anything from canonical.landscape (or other canonical.xxx modules), I didn't verify though, please check that first
  jml: then for the tac files..
  jml: job-hanlder imports from canonical.landscape.scripts, the quickest thing to do is probably cut & paste, it might turn out that you don't really need those wrappers and you can go with plain twisted machinery, I'm not sure
-<sidnei> andreas, when's the next deployment scheduled?
-<andreas> sidnei: worked, thanks
 <jml> free: only crappy stuff c.l.testing.twist
 <free> jml: then there's load_config from canonical.landscape.application, that is essentially to load the zcml configuration, for 1) the amqp connection details 2) the db/storm details
-<andreas> sidnei: it's a topic for today's meeting. A tentative date, if we follow our previous procedure, would be next monday
-<Beret> yeah we'll talk about that in the IRC meeting
 <free> jml: if you can go without that, I'm happy, I don't know the details but I suspect it was for working around bugs that were solved (my guess)
 <jml> free: what about all the env vars & literals?
 <free> jml: where?
  jml: oh
  jml: that's for choosing the config file to load
-<_mup_> landscape/sources.list-edit-profile-update r2942 committed by bjorn@canonical.com
- Rename notification (typo)
 <free> jml: if you're not in such a terrible rush and have some time, it'd be good to go with a config mechanism that doesn't require zcml, things will be simpler
 <jml> free: +1
 <free> jml: it should probably have a hook to load application-specific configuration in the job-handler process, like the db connections
@@ -151,13 +99,8 @@ Porting the daemons
 <free> jml: that should be configurable, it's just the prefix
  jml: what sidnei says
 <jml> ok, thanks.
-<sidnei> andreas, https://wiki.canonical.com/Landscape/LandscapeProductionStatus updated
 <free> jml: the other bit is from canonical.landscape.model.job.registry import get_handlers
-<andreas> sidnei: thanks
-<sidnei> andreas, #802536 filed
-<_mup_> Bug #802536: Package txstatsd <lds> <Landscape Server:New> < https://launchpad.net/bugs/802536 >
 <free> jml: if we had time that'd deserve more care
-<sidnei> andreas, pushed branches to lp:~landscape/graphite/{staging,production} and lp:~landscape/txstatsd/{staging,production}
 <free> jml: because lots of that has grown to be general enough to be extracted and included in the standalone project, I believe
 <jml> free: that'd be cool.
 <free> jml: but you can also go without it for now
@@ -166,23 +109,12 @@ Porting the daemons
  free: but, let's get it working first
 <free> jml: JobHandler(threadpool, get_handlers(), "landscape"), the get_handlers() just gets you a dictionary of job names to callables
  jml: sure
-<_mup_> landscape/qa-scripts r355 committed by andreas@canonical.com
- Added clouddeck DBs to prepare-pgsql-snapshot.sh
- landscape/qa-scripts r356 committed by andreas@canonical.com
- Updated update_logs.sh to fetch logs from new servers and dropped
- greengage.
 <free> jml: look at canonical.amqp.job.handler line 80 and after
 <andreas> sidnei: is txstatsd a case where we will have our own trunk (landscape's) and upstream?
 <free> jml: a dictionary of job names to callables is bare minimum required, but in practice you want to have some base Job class, so we should offer that facility, maybe as optional
  jml: also we'd like the ability to aggregate jobs so, a JobSet would be nice too
-<sidnei> andreas, likely not. we're currently upstream for it (that is, i wrote it)
 <free> jml: that's all for the future, you can get the ball rolling using the handlers dictionary, I'd say
-<andreas> sidnei: so, in landscape, we will use upstream directly for now?
 <jml> free: rockin'. thanks.
-<sidnei> andreas, correct
-<andreas> ok
 <free> jml: I think that's all for the job handler
-<-- smethia has quit (Input/output error)
 <free> jml: for async-frontend the same applies, it's probably even simpler
---> TREllis (trellis@canonical-cloaked-A275354F.trellisnet.co.uk) has joined #landscape
 <free> jml: it doesn't even need authentication, as it's implicit in the page_key concept (if you read the spec)
