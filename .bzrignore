@@ -9,3 +9,4 @@ eggs
 lazr.amqp.egg-info
 parts
 tags
+dist

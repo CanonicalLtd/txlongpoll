@@ -27,12 +27,10 @@ setup(
     zip_safe=False,
     description='Magic.',
     install_requires=[
-        'logging',
         'storm',
         'transaction',
         'twisted',
         'txamqp',
-        'uuid',
         'zope.component',
         'zope.configuration',
         'zope.interface',
