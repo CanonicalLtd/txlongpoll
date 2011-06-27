@@ -1,5 +1,11 @@
-_trial_temp
+.installed.cfg
 TAGS
-tags
+_trial_temp
+bin
 build
+develop-eggs
+download-cache/dist
+eggs
 lazr.amqp.egg-info
+parts
+tags
