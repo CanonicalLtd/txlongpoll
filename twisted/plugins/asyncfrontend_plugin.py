@@ -46,7 +46,7 @@ class Options(usage.Options):
 class AMQServiceMaker(object):
     """Create an asynchronous frontend server for AMQP."""
     implements(IServiceMaker, IPlugin)
-    tapname = "async-frontend"
+    tapname = "asyncfrontend"
     description = """
         Asynchronous frontend server.
 
@@ -91,5 +91,5 @@ class AMQServiceMaker(object):
 # The name of this variable is irrelevant, as long as there is *some*
 # name bound to a provider of IPlugin and IServiceMaker.
 
-serviceMaker = AMQFactory()
+serviceMaker = AMQServiceMaker()
 
