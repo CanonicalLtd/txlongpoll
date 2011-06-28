@@ -32,6 +32,13 @@ class AMQTest(TwistedTestCase):
     USER = "lazr.amqp"
     PASSWORD = "lazr.amqp"
 
+    rabbit = RabbitServer()
+
+    def __del__(self):
+        # XXX: __del__ is wrong and leaks rabbits, but it's all we have now.
+        if hasattr(self.rabbit, 'runner') and self.rabbit.runner.is_running():
+            self.rabbit.cleanUp()
+
     def setUp(self):
         """
         At each run, we delete the test vhost and recreate it, to be sure to be
@@ -42,16 +49,15 @@ class AMQTest(TwistedTestCase):
         self.exchanges = set()
         self.connected_deferred = Deferred()
 
-        self.rabbit = RabbitServer()
-        self.rabbit.setUp()
-        self.addCleanup(self.rabbit.cleanUp)
-
-        rabbitctl = self.rabbit.runner.environment.rabbitctl
-        rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
-        rabbitctl(('add_vhost', 'lazr.amqp-test'))
-        rabbitctl(
-            ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
-             '.*', '.*'))
+        if (not hasattr(self.rabbit, 'runner') or
+            not self.rabbit.runner.is_running()):
+            self.rabbit.setUp()
+            rabbitctl = self.rabbit.runner.environment.rabbitctl
+            rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
+            rabbitctl(('add_vhost', 'lazr.amqp-test'))
+            rabbitctl(
+                ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
+                '.*', '.*'))
         self.factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         self.factory.initialDelay = 2.0
@@ -68,7 +74,8 @@ class AMQTest(TwistedTestCase):
         self.connected_deferred = Deferred()
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
-        connector = reactor.connectTCP("localhost", 5672, factory)
+        connector = reactor.connectTCP(
+            self.rabbit.config.hostname, self.rabbit.config.port, factory)
         yield self.connected_deferred
         channel_id = 1
         for queue in self.queues:
