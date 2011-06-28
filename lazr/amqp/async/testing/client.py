@@ -28,7 +28,7 @@ class QueueWrapper(object):
 
 class AMQTest(TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(debug=True, timeout=1)
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(timeout=5)
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
