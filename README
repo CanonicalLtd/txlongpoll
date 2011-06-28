@@ -7,8 +7,10 @@ Building
 lazr.amqp needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
 
- $ python bootstrap.py
- $ bin/buildout
+You also need to get lp:rabbitfixture, build it and drop the egg in
+./download-cache/dist in order for lazr.amqp to build.
+
+ $ make
 
 
 Testing

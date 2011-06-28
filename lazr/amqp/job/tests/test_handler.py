@@ -1,8 +1,13 @@
-# Copyright 2005-2010 Canonical Limited.  All rights reserved.
+# Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 
 from unittest import defaultTestLoader
 import json
 
+from testtools.deferredruntest import (
+    assert_fails_with,
+    flush_logged_errors,
+    )
 from twisted.internet.defer import inlineCallbacks, returnValue, succeed, fail
 
 from txamqp.queue import Closed as QueueClosed
@@ -90,7 +95,7 @@ class JobHandlerTest(AMQTest):
             {"action": "dummy-action", "result": [2, True]})
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_all_arguments_are_unicode(self):
@@ -128,7 +133,7 @@ class JobHandlerTest(AMQTest):
             queue="test.notifications-queue.uuid1")
         yield (yield self.client.queue(reply.consumer_tag)).get()
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_job_failure(self):
@@ -168,12 +173,12 @@ class JobHandlerTest(AMQTest):
             json.loads(message.content.body),
             {"action": "dummy-action", "error": "foo"})
 
-        [error] = self.flushLoggedErrors()
+        [error] = flush_logged_errors()
         self.assertTrue(isinstance(error.value, RuntimeError))
         self.assertEquals(str(error.value), "foo")
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_job_synchronous_failure(self):
@@ -213,12 +218,12 @@ class JobHandlerTest(AMQTest):
             json.loads(message.content.body),
             {"action": "dummy-action", "error": "oops"})
 
-        [error] = self.flushLoggedErrors()
+        [error] = flush_logged_errors()
         self.assertTrue(isinstance(error.value, RuntimeError))
         self.assertEquals(str(error.value), "oops")
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_no_handler(self):
@@ -243,12 +248,12 @@ class JobHandlerTest(AMQTest):
 
         yield event_queue.get()
 
-        [error] = self.flushLoggedErrors()
+        [error] = flush_logged_errors()
         self.assertTrue(isinstance(error.value, RuntimeError))
         self.assertEquals(str(error.value), "No handler for 'unknown-action'")
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_multiple_handlers(self):
@@ -294,7 +299,7 @@ class JobHandlerTest(AMQTest):
             {"action": "other-action", "result": ["hello!", True]})
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
     @inlineCallbacks
     def test_no_namespace(self):
@@ -336,7 +341,7 @@ class JobHandlerTest(AMQTest):
             {"action": "dummy-action", "result": [2, True]})
 
         self.client.close(None)
-        yield self.assertFailure(d, QueueClosed)
+        yield assert_fails_with(d, QueueClosed)
 
 
 def test_suite():

@@ -1,26 +1,15 @@
 #!/usr/bin/env python
+# Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
 """Distutils installer for lazr.amqp."""
 
 from setuptools import setup, find_packages
 
 
-def get_revno():
-    import bzrlib.errors
-    import bzrlib.workingtree
-    try:
-        t = bzrlib.workingtree.WorkingTree.open_containing(__file__)[0]
-    except (bzrlib.errors.NotBranchError, bzrlib.errors.NoWorkingTree):
-        return None
-    else:
-        return t.branch.revno()
-
-
-def get_version():
-    return "0.0.1-r%s" % get_revno()
-
 setup(
     name='lazr.amqp',
-    version="0",#,get_version(),
+    version="0.0.1-alpha",
     packages=find_packages('.'),
     package_dir={'': '.'},
     include_package_data=True,
@@ -34,6 +23,7 @@ setup(
     install_requires=[
         'amqplib',
         'fixtures',
+        'rabbitfixture',
         'testtools',
         'transaction',
         'twisted',
