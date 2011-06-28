@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
 """Distutils installer for lazr.amqp."""
 
 from setuptools import setup, find_packages
