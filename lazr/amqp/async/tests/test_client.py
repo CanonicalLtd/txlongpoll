@@ -48,7 +48,7 @@ class AMQFactoryConnectedTest(AMQTest):
 
         def connected((client, channel)):
             self.assertTrue(isinstance(channel, AMQChannel))
-            self.assertNotIdentical(channel, self.channel)
+            self.assertIsNot(channel, self.channel)
             d.callback(None)
 
         self.factory.connected_callback = connected

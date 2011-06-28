@@ -1,7 +1,7 @@
 # Copyright 2005-2010 Canonical Limited.  All rights reserved.
 
 from testtools import TestCase
-from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.deferredruntest import AsynchronousDeferredRunTestForBrokenTwisted
 from twisted.internet.defer import Deferred, inlineCallbacks, DeferredQueue
 from twisted.internet import reactor
 
@@ -28,7 +28,7 @@ class QueueWrapper(object):
 
 class AMQTest(TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(debug=True, timeout=1)
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(debug=True, timeout=1)
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
@@ -62,11 +62,7 @@ class AMQTest(TestCase):
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         connector = reactor.connectTCP("localhost", 5672, factory)
-        try:
-            yield self.connected_deferred
-        except Exception, e:
-            print e
-            raise
+        yield self.connected_deferred
         channel_id = 1
         for queue in self.queues:
             try:
