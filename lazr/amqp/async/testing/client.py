@@ -7,6 +7,7 @@ from txamqp.client import Closed
 
 from lazr.amqp.async.client import AMQFactory
 from lazr.amqp.testing.twist import TwistedTestCase
+from lazr.amqp.testing.rabbit.server import RabbitServer
 
 
 class QueueWrapper(object):
@@ -41,10 +42,22 @@ class AMQTest(TwistedTestCase):
         self.exchanges = set()
         self.connected_deferred = Deferred()
 
+        self.rabbit = RabbitServer()
+        self.rabbit.setUp()
+        self.addCleanup(self.rabbit.cleanUp)
+
+        rabbitctl = self.rabbit.runner.environment.rabbitctl
+        rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
+        rabbitctl(('add_vhost', 'lazr.amqp-test'))
+        rabbitctl(
+            ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
+             '.*', '.*'))
         self.factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         self.factory.initialDelay = 2.0
-        self.connector = reactor.connectTCP("localhost", 5672, self.factory)
+        self.connector = reactor.connectTCP(
+            self.rabbit.config.hostname, self.rabbit.config.port,
+            self.factory)
         return self.connected_deferred
 
     @inlineCallbacks

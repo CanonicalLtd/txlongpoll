@@ -177,8 +177,10 @@ class RabbitServerEnvironment(Fixture):
         ctlbin = os.path.join(RABBITBIN, "rabbitmqctl")
         nodename = self.config.fq_nodename
         env = dict(os.environ, HOME=self.config.homedir)
+        if isinstance(command, str):
+            command = (command,)
         ctl = subprocess.Popen(
-            (ctlbin, "-n", nodename, command), env=env,
+            (ctlbin, "-n", nodename) + command, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             preexec_fn=preexec_fn)
         outstr, errstr = ctl.communicate()
