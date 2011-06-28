@@ -32,7 +32,6 @@ def setUpLogFile(application, filename):
 
 class Options(usage.Options):
     optParameters = [
-        ["port", "p", 1235, "The port number to listen on."],
         ["logfile", "l", None, "Optional logfile name."],
         ["brokerport", "p", None, "Broker port"],
         ["brokerhost", "h", None, "Broker host"],
@@ -69,7 +68,7 @@ class AMQServiceMaker(object):
         broker_user = options["brokeruser"]
         broker_password = options["brokerpassword"]
         broker_vhost = options["brokervhost"]
-        frontend_port = options["frontendport"]
+        frontend_port = int(options["frontendport"])
 
         manager = QueueManager("XXX")
         factory = AMQFactory(
