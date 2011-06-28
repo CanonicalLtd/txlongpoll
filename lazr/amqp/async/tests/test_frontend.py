@@ -6,10 +6,7 @@ import json
 from cStringIO import StringIO
 
 from testtools import TestCase
-from testtools.deferredruntest import (
-    assert_fails_with,
-    flush_logged_errors,
-    )
+from testtools.deferredruntest import assert_fails_with
 from twisted.internet.task import Clock, deferLater
 from twisted.internet.defer import inlineCallbacks, succeed, fail, Deferred
 from twisted.internet import reactor
