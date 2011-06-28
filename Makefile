@@ -37,7 +37,7 @@ $(subst $(PY),,$(BUILDOUT_BIN)): $(PY)
 build: $(BUILDOUT_BIN)
 
 
-sdist: setup.py
+dist: setup.py
 	$(PY) setup.py egg_info -r sdist
 
 
@@ -45,4 +45,4 @@ check: bin/test
 	./bin/test -vv
 
 
-.PHONY: build check default sdist
+.PHONY: build check default dist
