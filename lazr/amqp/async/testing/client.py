@@ -1,13 +1,16 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from testtools import TestCase
+from testtools.deferredruntest import (
+    AsynchronousDeferredRunTestForBrokenTwisted,
+    )
 from twisted.internet.defer import Deferred, inlineCallbacks, DeferredQueue
 from twisted.internet import reactor
 
 from txamqp.client import Closed
 
 from lazr.amqp.async.client import AMQFactory
-from lazr.amqp.testing.twist import TwistedTestCase
 
 
 class QueueWrapper(object):
@@ -26,7 +29,10 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
-class AMQTest(TwistedTestCase):
+class AMQTest(TestCase):
+
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
+        timeout=5)
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
@@ -37,7 +43,7 @@ class AMQTest(TwistedTestCase):
         At each run, we delete the test vhost and recreate it, to be sure to be
         in a clean environment.
         """
-        TwistedTestCase.setUp(self)
+        super(AMQTest, self).setUp()
         self.queues = set()
         self.exchanges = set()
         self.connected_deferred = Deferred()
@@ -50,6 +56,9 @@ class AMQTest(TwistedTestCase):
 
     @inlineCallbacks
     def tearDown(self):
+        # XXX: Moving this up here to silence a nigh-on inexplicable error
+        # that occurs when it's at the bottom of the function.
+        super(AMQTest, self).tearDown()
         self.factory.stopTrying()
         self.connector.disconnect()
 
@@ -75,7 +84,6 @@ class AMQTest(TwistedTestCase):
                 yield self.channel.channel_open()
         factory.stopTrying()
         connector.disconnect()
-        TwistedTestCase.tearDown(self)
 
     def amq_connected(self, (client, channel)):
         """

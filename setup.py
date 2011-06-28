@@ -22,6 +22,7 @@ setup(
     ),
     install_requires=[
         'rabbitfixture',
+        'testtools',
         'transaction',
         'twisted',
         'txamqp',

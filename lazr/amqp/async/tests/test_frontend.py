@@ -5,6 +5,11 @@ from unittest import defaultTestLoader
 import json
 from cStringIO import StringIO
 
+from testtools import TestCase
+from testtools.deferredruntest import (
+    assert_fails_with,
+    flush_logged_errors,
+    )
 from twisted.internet.task import Clock, deferLater
 from twisted.internet.defer import inlineCallbacks, succeed, fail, Deferred
 from twisted.internet import reactor
@@ -15,7 +20,6 @@ from txamqp.content import Content
 
 from lazr.amqp.async.frontend import QueueManager, FrontEndAjax, NotFound
 from lazr.amqp.async.testing.client import AMQTest, QueueWrapper
-from lazr.amqp.testing.twist import TwistedTestCase
 
 
 class QueueManagerTest(AMQTest):
@@ -25,7 +29,6 @@ class QueueManagerTest(AMQTest):
         self.manager = QueueManager("test")
         return AMQTest.setUp(self)
 
-    @inlineCallbacks
     def test_wb_connected(self):
         """
         The C{connected} callback of L{QueueManager} sets the C{_client} and
@@ -34,9 +37,9 @@ class QueueManagerTest(AMQTest):
         d = self.manager.connected((self.client, self.channel))
         self.assertTrue(isinstance(self.manager._client, AMQClient))
         self.assertTrue(isinstance(self.manager._channel, AMQChannel))
-        self.assertIdentical(self.manager._client, self.client)
-        self.assertIdentical(self.manager._channel, self.channel)
-        yield d
+        self.assertIs(self.manager._client, self.client)
+        self.assertIs(self.manager._channel, self.channel)
+        return d
 
     @inlineCallbacks
     def test_get_message(self):
@@ -101,7 +104,7 @@ class QueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield self.assertFailure(d, Empty)
+        yield assert_fails_with(d, Empty)
 
     @inlineCallbacks
     def test_get_message_after_error(self):
@@ -111,7 +114,7 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         d = self.manager.get_message("uuid_unknown", "0")
-        yield self.assertFailure(d, NotFound)
+        yield assert_fails_with(d, NotFound)
         self.assertTrue(self.channel.closed)
         yield deferLater(reactor, 0.1, lambda: None)
         self.assertTrue(self.client.transport.disconnected)
@@ -139,7 +142,7 @@ class QueueManagerTest(AMQTest):
 
         d2 = self.manager.get_message("uuid_unknown", "0")
 
-        yield self.assertFailure(d2, NotFound)
+        yield assert_fails_with(d2, NotFound)
         self.assertTrue(self.channel.closed)
 
         self.connected_deferred = Deferred()
@@ -171,7 +174,7 @@ class QueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield self.assertFailure(d, Empty)
+        yield assert_fails_with(d, Empty)
 
         self.assertNotIn("test.notifications-tag.uuid1.0", self.client.queues)
 
@@ -226,7 +229,7 @@ class QueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield self.assertFailure(d1, Empty)
+        yield assert_fails_with(d1, Empty)
 
         # Let's wrap the queue again
         reply = yield self.client.queue("test.notifications-tag.uuid1.1")
@@ -237,7 +240,7 @@ class QueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield self.assertFailure(d2, Empty)
+        yield assert_fails_with(d2, Empty)
 
 
 class FakeMessageQueue(object):
@@ -287,13 +290,13 @@ class FakeRequest(object):
         pass
 
 
-class FrontEndAjaxTest(TwistedTestCase):
+class FrontEndAjaxTest(TestCase):
     """
     Tests for L{FrontEndAjax}.
     """
 
     def setUp(self):
-        TwistedTestCase.setUp(self)
+        super(FrontEndAjaxTest, self).setUp()
         self.message_queue = FakeMessageQueue()
         self.ajax = FrontEndAjax(self.message_queue)
 
@@ -350,7 +353,6 @@ class FrontEndAjaxTest(TwistedTestCase):
         self.ajax.render(request)
         self.assertEquals(request.written.getvalue(), "Not there")
         self.assertEquals(request.code, 500)
-        [error] = self.flushLoggedErrors(ValueError)
 
     def test_render_monitor(self):
         """
