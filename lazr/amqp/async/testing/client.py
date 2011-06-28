@@ -1,7 +1,9 @@
 # Copyright 2005-2010 Canonical Limited.  All rights reserved.
 
 from testtools import TestCase
-from testtools.deferredruntest import AsynchronousDeferredRunTestForBrokenTwisted
+from testtools.deferredruntest import (
+    AsynchronousDeferredRunTestForBrokenTwisted,
+    )
 from twisted.internet.defer import Deferred, inlineCallbacks, DeferredQueue
 from twisted.internet import reactor
 
@@ -28,7 +30,8 @@ class QueueWrapper(object):
 
 class AMQTest(TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
+        timeout=5)
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
