@@ -40,6 +40,7 @@ class NotificationDispatcherTests(AMQTest):
             queue="test.notifications-queue.uuid1",
             exchange="test.notifications-exchange",
             routing_key="namespace")
+        print 'spam'
 
     @inlineCallbacks
     def test_send_action(self):

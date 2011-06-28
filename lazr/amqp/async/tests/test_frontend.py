@@ -4,6 +4,7 @@ from unittest import defaultTestLoader
 import json
 from cStringIO import StringIO
 
+from testtools.deferredruntest import flush_logged_errors
 from twisted.internet.task import Clock, deferLater
 from twisted.internet.defer import inlineCallbacks, succeed, fail, Deferred
 from twisted.internet import reactor
@@ -349,7 +350,7 @@ class FrontEndAjaxTest(TwistedTestCase):
         self.ajax.render(request)
         self.assertEquals(request.written.getvalue(), "Not there")
         self.assertEquals(request.code, 500)
-        [error] = self.flushLoggedErrors(ValueError)
+        [error] = flush_logged_errors(ValueError)
 
     def test_render_monitor(self):
         """

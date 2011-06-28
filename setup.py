@@ -32,6 +32,7 @@ setup(
         ]
     ),
     install_requires=[
+        'testtools',
         'transaction',
         'twisted',
         'txamqp',

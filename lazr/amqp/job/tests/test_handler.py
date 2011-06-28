@@ -3,6 +3,7 @@
 from unittest import defaultTestLoader
 import json
 
+from testtools.deferredruntest import flush_logged_errors
 from twisted.internet.defer import inlineCallbacks, returnValue, succeed, fail
 
 from txamqp.queue import Closed as QueueClosed
@@ -168,7 +169,7 @@ class JobHandlerTest(AMQTest):
             json.loads(message.content.body),
             {"action": "dummy-action", "error": "foo"})
 
-        [error] = self.flushLoggedErrors()
+        [error] = flush_logged_errors()
         self.assertTrue(isinstance(error.value, RuntimeError))
         self.assertEquals(str(error.value), "foo")
 

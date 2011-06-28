@@ -1,12 +1,13 @@
 # Copyright 2005-2010 Canonical Limited.  All rights reserved.
 
+from testtools import TestCase
+from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet.defer import Deferred, inlineCallbacks, DeferredQueue
 from twisted.internet import reactor
 
 from txamqp.client import Closed
 
 from lazr.amqp.async.client import AMQFactory
-from lazr.amqp.testing.twist import TwistedTestCase
 
 
 class QueueWrapper(object):
@@ -25,7 +26,9 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
-class AMQTest(TwistedTestCase):
+class AMQTest(TestCase):
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(debug=True, timeout=1)
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
@@ -36,7 +39,7 @@ class AMQTest(TwistedTestCase):
         At each run, we delete the test vhost and recreate it, to be sure to be
         in a clean environment.
         """
-        TwistedTestCase.setUp(self)
+        super(AMQTest, self).setUp()
         self.queues = set()
         self.exchanges = set()
         self.connected_deferred = Deferred()
@@ -49,6 +52,7 @@ class AMQTest(TwistedTestCase):
 
     @inlineCallbacks
     def tearDown(self):
+        print 'Tearing down'
         self.factory.stopTrying()
         self.connector.disconnect()
 
@@ -56,7 +60,11 @@ class AMQTest(TwistedTestCase):
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         connector = reactor.connectTCP("localhost", 5672, factory)
-        yield self.connected_deferred
+        try:
+            yield self.connected_deferred
+        except Exception, e:
+            print e
+            raise
         channel_id = 1
         for queue in self.queues:
             try:
@@ -74,7 +82,7 @@ class AMQTest(TwistedTestCase):
                 yield self.channel.channel_open()
         factory.stopTrying()
         connector.disconnect()
-        TwistedTestCase.tearDown(self)
+        super(AMQTest, self).tearDown()
 
     def amq_connected(self, (client, channel)):
         """
