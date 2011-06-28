@@ -52,7 +52,9 @@ class AMQTest(TestCase):
 
     @inlineCallbacks
     def tearDown(self):
-        print 'Tearing down'
+        # XXX: Moving this up here to silence a nigh-on inexplicable error
+        # that occurs when it's at the bottom of the function.
+        super(AMQTest, self).tearDown()
         self.factory.stopTrying()
         self.connector.disconnect()
 
@@ -82,7 +84,6 @@ class AMQTest(TestCase):
                 yield self.channel.channel_open()
         factory.stopTrying()
         connector.disconnect()
-        super(AMQTest, self).tearDown()
 
     def amq_connected(self, (client, channel)):
         """
