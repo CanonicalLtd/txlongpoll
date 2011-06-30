@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='lazr.amqp',
-    version="0.0.1-alpha",
+    version="0.1",
     packages=find_packages('.'),
     package_dir={'': '.'},
     include_package_data=True,
