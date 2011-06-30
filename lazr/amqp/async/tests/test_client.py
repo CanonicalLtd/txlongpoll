@@ -7,6 +7,7 @@ Tests for C{AMQFactory}.
 
 from unittest import TestCase, defaultTestLoader
 
+from testtools.deferredruntest import flush_logged_errors
 from twisted.internet.defer import Deferred
 
 from txamqp.spec import Spec
@@ -48,7 +49,7 @@ class AMQFactoryConnectedTest(AMQTest):
 
         def connected((client, channel)):
             self.assertTrue(isinstance(channel, AMQChannel))
-            self.assertNotIdentical(channel, self.channel)
+            self.assertIsNot(channel, self.channel)
             d.callback(None)
 
         self.factory.connected_callback = connected
@@ -73,7 +74,7 @@ class AMQClosingTest(AMQTest):
         This test ensures that L{Closed} exception raised by C{amq_connected}
         is swallowed by L{AMQFactory}.
         """
-        errors = self.flushLoggedErrors()
+        errors = flush_logged_errors()
         self.assertEquals(len(errors), 0)
 
 

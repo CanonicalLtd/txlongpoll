@@ -21,7 +21,11 @@ setup(
         ]
     ),
     install_requires=[
+        'amqplib',
+        'fixtures',
         'rabbitfixture',
+        'testresources',
+        'testtools',
         'transaction',
         'twisted',
         'txamqp',

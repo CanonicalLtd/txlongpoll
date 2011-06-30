@@ -10,8 +10,7 @@ lazr.amqp needs a recent RabbitMQ with support for rejection. Maverick's
 You also need to get lp:rabbitfixture, build it and drop the egg in
 ./download-cache/dist in order for lazr.amqp to build.
 
- $ python bootstrap.py
- $ bin/buildout
+ $ make build
 
 
 Testing
