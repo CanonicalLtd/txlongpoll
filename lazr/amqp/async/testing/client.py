@@ -15,7 +15,7 @@ from twisted.internet import reactor
 from txamqp.client import Closed
 
 from lazr.amqp.async.client import AMQFactory
-from lazr.amqp.testing.rabbit.server import RabbitServer
+from rabbitfixture.server import RabbitServer
 
 
 class QueueWrapper(object):
