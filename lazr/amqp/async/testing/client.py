@@ -1,6 +1,10 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from testresources import (
+    FixtureResource,
+    ResourcedTestCase,
+    )
 from testtools import TestCase
 from testtools.deferredruntest import (
     AsynchronousDeferredRunTestForBrokenTwisted,
@@ -11,6 +15,7 @@ from twisted.internet import reactor
 from txamqp.client import Closed
 
 from lazr.amqp.async.client import AMQFactory
+from rabbitfixture.server import RabbitServer
 
 
 class QueueWrapper(object):
@@ -29,10 +34,24 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
-class AMQTest(TestCase):
+class UserAddingRabbitServer(RabbitServer):
+
+    def setUp(self):
+        super(UserAddingRabbitServer, self).setUp()
+        rabbitctl = self.runner.environment.rabbitctl
+        rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
+        rabbitctl(('add_vhost', 'lazr.amqp-test'))
+        rabbitctl(
+            ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
+            '.*', '.*'))
+
+
+class AMQTest(ResourcedTestCase, TestCase):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
         timeout=5)
+
+    resources = [('rabbit', FixtureResource(UserAddingRabbitServer()))]
 
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
@@ -51,21 +70,29 @@ class AMQTest(TestCase):
         self.factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         self.factory.initialDelay = 2.0
-        self.connector = reactor.connectTCP("localhost", 5672, self.factory)
+        self.connector = reactor.connectTCP(
+            self.rabbit.config.hostname, self.rabbit.config.port,
+            self.factory)
         return self.connected_deferred
 
     @inlineCallbacks
     def tearDown(self):
         # XXX: Moving this up here to silence a nigh-on inexplicable error
         # that occurs when it's at the bottom of the function.
-        super(AMQTest, self).tearDown()
         self.factory.stopTrying()
         self.connector.disconnect()
+        super(AMQTest, self).tearDown()
+
+        # XXX: This is only safe because we tear down the whole server.
+        #      We can't run this after the tearDown above, because the
+        #      fixture is gone.
+        return
 
         self.connected_deferred = Deferred()
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
-        connector = reactor.connectTCP("localhost", 5672, factory)
+        connector = reactor.connectTCP(
+            self.rabbit.config.hostname, self.rabbit.config.port, factory)
         yield self.connected_deferred
         channel_id = 1
         for queue in self.queues:
