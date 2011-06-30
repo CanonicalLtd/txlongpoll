@@ -1,6 +1,10 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from testresources import (
+    FixtureResource,
+    ResourcedTestCase,
+    )
 from testtools import TestCase
 from testtools.deferredruntest import (
     AsynchronousDeferredRunTestForBrokenTwisted,
@@ -30,21 +34,28 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
-class AMQTest(TestCase):
+class UserAddingRabbitServer(RabbitServer):
+
+    def setUp(self):
+        super(UserAddingRabbitServer, self).setUp()
+        rabbitctl = self.runner.environment.rabbitctl
+        rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
+        rabbitctl(('add_vhost', 'lazr.amqp-test'))
+        rabbitctl(
+            ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
+            '.*', '.*'))
+
+
+class AMQTest(ResourcedTestCase, TestCase):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
         timeout=5)
 
+    resources = [('rabbit', FixtureResource(UserAddingRabbitServer()))]
+
     VHOST = "lazr.amqp-test"
     USER = "lazr.amqp"
     PASSWORD = "lazr.amqp"
-
-    rabbit = RabbitServer()
-
-    def __del__(self):
-        # XXX: __del__ is wrong and leaks rabbits, but it's all we have now.
-        if hasattr(self.rabbit, 'runner') and self.rabbit.runner.is_running():
-            self.rabbit.cleanUp()
 
     def setUp(self):
         """
@@ -56,15 +67,6 @@ class AMQTest(TestCase):
         self.exchanges = set()
         self.connected_deferred = Deferred()
 
-        if (not hasattr(self.rabbit, 'runner') or
-            not self.rabbit.runner.is_running()):
-            self.rabbit.setUp()
-            rabbitctl = self.rabbit.runner.environment.rabbitctl
-            rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
-            rabbitctl(('add_vhost', 'lazr.amqp-test'))
-            rabbitctl(
-                ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
-                '.*', '.*'))
         self.factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,
             self.amq_connected, self.amq_disconnected, self.amq_failed)
         self.factory.initialDelay = 2.0
@@ -77,9 +79,14 @@ class AMQTest(TestCase):
     def tearDown(self):
         # XXX: Moving this up here to silence a nigh-on inexplicable error
         # that occurs when it's at the bottom of the function.
-        super(AMQTest, self).tearDown()
         self.factory.stopTrying()
         self.connector.disconnect()
+        super(AMQTest, self).tearDown()
+
+        # XXX: This is only safe because we tear down the whole server.
+        #      We can't run this after the tearDown above, because the
+        #      fixture is gone.
+        return
 
         self.connected_deferred = Deferred()
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,

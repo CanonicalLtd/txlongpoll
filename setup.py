@@ -24,6 +24,7 @@ setup(
         'amqplib',
         'fixtures',
         'rabbitfixture',
+        'testresources',
         'testtools',
         'transaction',
         'twisted',
