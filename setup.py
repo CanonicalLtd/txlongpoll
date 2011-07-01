@@ -10,7 +10,11 @@ from setuptools import setup, find_packages
 setup(
     name='lazr.amqp',
     version="0.1",
-    packages=find_packages('.'),
+    packages=find_packages('.') + ['twisted.plugins'],
+    package_data={
+        'twisted': ['plugins/asyncfrontend_plugin.py'],
+    },
+    data_files=[('lazr/amqp/specs', ['lazr/amqp/specs/amqp0-8.xml'])],
     package_dir={'': '.'},
     include_package_data=True,
     zip_safe=False,
