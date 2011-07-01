@@ -42,16 +42,14 @@ class Options(usage.Options):
         ]
 
     def postOptions(self):
-        if not self['frontendport']:
-            raise usage.UsageError("--frontendport must be specified.")
-        try:
-            self['brokerport'] = int(self['brokerport'])
-        except (TypeError, ValueError):
-            raise usage.UsageError("--brokerport must be an integer.")
-        try:
-            self['frontendport'] = int(self['frontendport'])
-        except (TypeError, ValueError):
-            raise usage.UsageError("--frontendport must be an integer.")
+        for man_arg in ('frontendport', 'brokeruser', 'brokerpassword'):
+            if not self[man_arg]:
+                raise usage.UsageError("--%s must be specified." % man_arg)
+        for int_arg in ('brokerport', 'frontendport'):
+            try:
+                self[int_arg] = int(self[int_arg])
+            except (TypeError, ValueError):
+                raise usage.UsageError("--%s must be an integer." % int_arg)
 
 
 class AMQServiceMaker(object):
