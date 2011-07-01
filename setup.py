@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='lazr.amqp',
-    version="0.1",
+    version="0.2",
     packages=find_packages('.') + ['twisted.plugins'],
     package_data={
         'twisted': ['plugins/asyncfrontend_plugin.py'],
