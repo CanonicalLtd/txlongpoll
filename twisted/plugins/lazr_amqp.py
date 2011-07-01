@@ -6,8 +6,7 @@ import signal
 from zope.interface import implements
 
 from twisted.application.internet import TCPServer, TCPClient
-from twisted.application.service import (
-    Application, IServiceMaker, MultiService)
+from twisted.application.service import IServiceMaker, MultiService
 from twisted.plugin import IPlugin
 from twisted.python import log, usage
 from twisted.python.log import ILogObserver, FileLogObserver
@@ -42,19 +41,24 @@ class Options(usage.Options):
         ["prefix", "x", 'XXX', "Queue prefix"],
         ]
 
+    def postOptions(self):
+        if not self['frontendport']:
+            raise usage.UsageError("--frontendport must be specified.")
+        try:
+            self['brokerport'] = int(self['brokerport'])
+        except (TypeError, ValueError):
+            raise usage.UsageError("--brokerport must be an integer.")
+        try:
+            self['frontendport'] = int(self['frontendport'])
+        except (TypeError, ValueError):
+            raise usage.UsageError("--frontendport must be an integer.")
+
 
 class AMQServiceMaker(object):
     """Create an asynchronous frontend server for AMQP."""
     implements(IServiceMaker, IPlugin)
-    tapname = "asyncfrontend"
-    description = """
-        Asynchronous frontend server.
-
-        This application contains 2 components: the queue manager, which
-        received queue creation commands from the Web UI and subscribes to
-        them, and the Ajax frontend, which receives HTTP calls from Javascript
-        and gets messages from the queue manager.
-        """
+    tapname = "amqp-longpoll"
+    description = "An AMQP long-poll HTTP service."
 
     options = Options
 
@@ -64,12 +68,12 @@ class AMQServiceMaker(object):
         #if options["logfile"]:
         #    setUpLogFile(application, options["logfile"])
 
-        broker_port = int(options["brokerport"])
+        broker_port = options["brokerport"]
         broker_host = options["brokerhost"]
         broker_user = options["brokeruser"]
         broker_password = options["brokerpassword"]
         broker_vhost = options["brokervhost"]
-        frontend_port = int(options["frontendport"])
+        frontend_port = options["frontendport"]
         prefix = options["prefix"]
 
         manager = QueueManager(prefix)
@@ -93,4 +97,3 @@ class AMQServiceMaker(object):
 # name bound to a provider of IPlugin and IServiceMaker.
 
 serviceMaker = AMQServiceMaker()
-
