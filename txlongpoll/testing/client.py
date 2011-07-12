@@ -34,28 +34,16 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
-class UserAddingRabbitServer(RabbitServer):
-
-    def setUp(self):
-        super(UserAddingRabbitServer, self).setUp()
-        rabbitctl = self.runner.environment.rabbitctl
-        rabbitctl(('add_user', 'lazr.amqp', 'lazr.amqp'))
-        rabbitctl(('add_vhost', 'lazr.amqp-test'))
-        rabbitctl(
-            ('set_permissions', '-p', 'lazr.amqp-test', 'lazr.amqp', '.*',
-            '.*', '.*'))
-
-
 class AMQTest(ResourcedTestCase, TestCase):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
         timeout=5)
 
-    resources = [('rabbit', FixtureResource(UserAddingRabbitServer()))]
+    resources = [('rabbit', FixtureResource(RabbitServer()))]
 
-    VHOST = "lazr.amqp-test"
-    USER = "lazr.amqp"
-    PASSWORD = "lazr.amqp"
+    VHOST = "/"
+    USER = "guest"
+    PASSWORD = "guest"
 
     def setUp(self):
         """
