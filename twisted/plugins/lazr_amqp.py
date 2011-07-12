@@ -13,8 +13,8 @@ from twisted.python.log import ILogObserver, FileLogObserver
 from twisted.python.logfile import LogFile
 from twisted.web.server import Site
 
-from lazr.amqp.async.client import AMQFactory
-from lazr.amqp.async.frontend import QueueManager, FrontEndAjax
+from txlongpoll.client import AMQFactory
+from txlongpoll.frontend import QueueManager, FrontEndAjax
 
 
 def setUpLogFile(application, filename):

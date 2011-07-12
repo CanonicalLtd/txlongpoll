@@ -14,8 +14,8 @@ from txamqp.spec import Spec
 from txamqp.protocol import AMQChannel
 from txamqp.queue import Closed
 
-from lazr.amqp.async.client import AMQFactory
-from lazr.amqp.async.testing.client import AMQTest
+from txlongpoll.client import AMQFactory
+from txlongpoll.testing.client import AMQTest
 
 
 class AMQFactoryTest(TestCase):

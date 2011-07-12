@@ -15,8 +15,8 @@ from txamqp.protocol import AMQChannel, AMQClient
 from txamqp.queue import Empty
 from txamqp.content import Content
 
-from lazr.amqp.async.frontend import QueueManager, FrontEndAjax, NotFound
-from lazr.amqp.async.testing.client import AMQTest, QueueWrapper
+from txlongpoll.frontend import QueueManager, FrontEndAjax, NotFound
+from txlongpoll.testing.client import AMQTest, QueueWrapper
 
 
 class QueueManagerTest(AMQTest):
