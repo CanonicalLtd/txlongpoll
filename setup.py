@@ -17,13 +17,9 @@ setup(
     zip_safe=False,
     description='Magic.',
     install_requires=[
-        'transaction',
         'twisted',
         'txamqp',
-        'zope.component',
-        'zope.configuration',
         'zope.interface',
-        'zope.schema',
         ],
     extras_require={
         'test': [
