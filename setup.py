@@ -12,9 +12,9 @@ setup(
     version="0.2",
     packages=find_packages('.') + ['twisted.plugins'],
     package_data={
-        'twisted': ['plugins/asyncfrontend_plugin.py'],
+        'twisted': ['plugins/longpoll.py'],
     },
-    data_files=[('txlongpoll/specs', ['txlongpoll/amqp0-8.xml'])],
+    data_files=[('txlongpoll/specs', ['txlongpoll/specs/amqp0-8.xml'])],
     package_dir={'': '.'},
     include_package_data=True,
     zip_safe=False,
