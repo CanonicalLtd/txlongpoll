@@ -25,16 +25,10 @@ setup(
         ]
     ),
     install_requires=[
-        'amqplib',
-        'fixtures',
         'rabbitfixture',
         'testresources',
         'testtools',
-        'transaction',
         'twisted',
         'txamqp',
-        'zope.component',
-        'zope.configuration',
         'zope.interface',
-        'zope.schema',
         ])
