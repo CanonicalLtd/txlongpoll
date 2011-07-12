@@ -17,11 +17,6 @@ setup(
     zip_safe=False,
     description='Magic.',
     install_requires=[
-        'amqplib',
-        'fixtures',
-        'rabbitfixture',
-        'testresources',
-        'testtools',
         'transaction',
         'twisted',
         'txamqp',
@@ -29,4 +24,11 @@ setup(
         'zope.configuration',
         'zope.interface',
         'zope.schema',
-        ])
+        ],
+    extras_require={
+        'test': [
+            'rabbitfixture',
+            'testresources',
+            'testtools',
+            ],
+        })
