@@ -11,23 +11,18 @@ setup(
     name='txlongpoll',
     version="0.2",
     packages=find_packages('.') + ['twisted.plugins'],
-    package_data={
-        'twisted': ['plugins/longpoll.py'],
-    },
-    data_files=[('txlongpoll/specs', ['txlongpoll/specs/amqp0-8.xml'])],
-    package_dir={'': '.'},
     include_package_data=True,
     zip_safe=False,
-    description='Magic.',
+    description='Long polling HTTP frontend for AMQP',
     install_requires=[
         'twisted',
         'txamqp',
         'zope.interface',
         ],
-    extras_require={
-        'test': [
+    extras_require=dict(
+        test=[
             'rabbitfixture',
             'testresources',
             'testtools',
             ],
-        })
+        ))
