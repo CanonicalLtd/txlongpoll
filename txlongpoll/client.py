@@ -33,8 +33,7 @@ class AMQClientWithCallback(AMQClient):
         self.connected_callback(self)
 
 
-_base_dir = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__)))
+_base_dir = os.path.dirname(os.path.abspath(__file__))
 AMQP0_8_SPEC = load_spec(os.path.join(_base_dir, "specs", "amqp0-8.xml"))
 del _base_dir
 

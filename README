@@ -4,11 +4,11 @@ Generic long poll server used by Launchpad and Landscape.
 Building
 --------
 
-lazr.amqp needs a recent RabbitMQ with support for rejection. Maverick's
+txlongpoll needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
 
 You also need to get lp:rabbitfixture, build it and drop the egg in
-./download-cache/dist in order for lazr.amqp to build.
+./download-cache/dist in order for txlongpoll to build.
 
  $ make build
 
@@ -16,8 +16,4 @@ You also need to get lp:rabbitfixture, build it and drop the egg in
 Testing
 -------
 
-The test suite needs some users and vhosts on the system RabbitMQ
-instance.
-
- $ ./rabbitmq-test-setup
  $ bin/test

@@ -1,1 +1,1 @@
-include lazr/amqp/specs/amqp0-8.xml
+include txlongpoll/specs/amqp0-8.xml

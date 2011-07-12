@@ -14,7 +14,7 @@ from twisted.internet import reactor
 
 from txamqp.client import Closed
 
-from lazr.amqp.async.client import AMQFactory
+from txlongpoll.client import AMQFactory
 from rabbitfixture.server import RabbitServer
 
 
