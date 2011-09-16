@@ -124,10 +124,12 @@ class QueueManager(object):
             if e.args and e.args[0].reply_code == 404:
                 raise NotFound()
             else:
+                # TODO: file oops
                 raise
         except:
             if self._client and self._client.transport:
                 self._client.transport.loseConnection()
+            # TODO: file oops
             raise
 
         yield self._channel.basic_cancel(consumer_tag=tag, nowait=True)
