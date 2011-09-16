@@ -22,7 +22,7 @@ setup(
     extras_require=dict(
         test=[
             'rabbitfixture',
-            'testresources',
+            'testresources >= 0.2.4_r58',
             'testtools',
             ],
         ))
