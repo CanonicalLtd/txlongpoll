@@ -45,4 +45,22 @@ check: bin/test
 	./bin/test -vv
 
 
+clean_buildout: 
+	$(RM) -r bin
+	$(RM) -r parts
+	$(RM) -r develop-eggs
+	$(RM) .installed.cfg
+	$(RM) -r build
+
+
+clean_eggs:
+	$(RM) -r download-cache
+	$(RM) -r eggs
+
+
+clean: clean_buildout
+
+clean_all: clean_buildout clean_eggs
+
+
 .PHONY: build check default dist
