@@ -8,7 +8,8 @@ txlongpoll needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
 
 You also need to get lp:rabbitfixture, build it and drop the egg in
-./download-cache/dist in order for txlongpoll to build.
+./download-cache/dist in order for txlongpoll to build.  You will also possibly
+need to do the same for testresources-0.2.4_r58 until it reaches PyPI.
 
  $ make build
 
@@ -17,3 +18,9 @@ Testing
 -------
 
  $ bin/test
+
+
+Running
+-------
+
+ $ bin/twistd amqp-longpoll
