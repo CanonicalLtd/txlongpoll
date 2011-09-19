@@ -77,9 +77,6 @@ class AMQClosingTest(AMQTest):
         errors = flush_logged_errors()
         self.assertEquals(len(errors), 0)
 
-    # TODO: Add another test to throw a different exception that is not
-    # trapped and make sure an OOPS was filed.
-
 
 def test_suite():
     return defaultTestLoader.loadTestsFromName(__name__)

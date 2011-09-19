@@ -99,7 +99,6 @@ class AMQFactory(ReconnectingClientFactory):
 
         def catch_closed(failure):
             failure.trap(Closed)
-            # TODO: raise oops
 
         deferred = client.authenticate(self.user, self.password)
         return deferred.addCallback(started)
