@@ -15,7 +15,7 @@ setup(
     zip_safe=False,
     description='Long polling HTTP frontend for AMQP',
     install_requires=[
-        'twisted',
+        'Twisted',
         'txamqp',
         'zope.interface',
         ],
