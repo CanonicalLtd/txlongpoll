@@ -90,10 +90,6 @@ class AMQServiceMaker(object):
 
     def makeService(self, options):
         """Construct a TCPServer and TCPClient. """
-        # See Twisted bug 638.
-        #if options["logfile"]:
-        #    setUpLogFile(application, options["logfile"])
-
         setUpOopsHandler(options)
 
         broker_port = options["brokerport"]
