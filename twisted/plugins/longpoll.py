@@ -57,7 +57,7 @@ def setUpOopsHandler(options):
 
 class Options(usage.Options):
     optParameters = [
-        ["logfile", "l", None, "Optional logfile name."],
+        ["logfile", "l", "txlongpoll.log", "Logfile name."],
         ["brokerport", "p", 5672, "Broker port"],
         ["brokerhost", "h", '127.0.0.1', "Broker host"],
         ["brokeruser", "u", None, "Broker user"],
