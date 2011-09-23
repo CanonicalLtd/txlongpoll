@@ -44,7 +44,7 @@ def setUpOopsHandler(options):
 
     # Add the oops publisher that writes files in the configured place
     # if the command line option was set.
-    if options.get["oops-dir"]:
+    if options["oops-dir"]:
         repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
         config.publishers.append(defer_publisher(repo))
 
