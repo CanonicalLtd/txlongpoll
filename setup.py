@@ -15,6 +15,7 @@ setup(
     zip_safe=False,
     description='Long polling HTTP frontend for AMQP',
     install_requires=[
+        'oops_datedir_repo',
         'oops_twisted',
         'Twisted',
         'txamqp',

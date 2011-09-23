@@ -5,11 +5,20 @@ import signal
 
 from zope.interface import implements
 
+from oops_datedir_repo import DateDirRepo
+from oops_twisted import (
+    Config as oops_config,
+    defer_publisher,
+    OOPSObserver,
+    )
 from twisted.application.internet import TCPServer, TCPClient
 from twisted.application.service import IServiceMaker, MultiService
 from twisted.plugin import IPlugin
 from twisted.python import log, usage
-from twisted.python.log import ILogObserver, FileLogObserver
+from twisted.python.log import (
+    addObserver,
+    FileLogObserver
+    )
 from twisted.python.logfile import LogFile
 from twisted.web.server import Site
 
@@ -17,7 +26,7 @@ from txlongpoll.client import AMQFactory
 from txlongpoll.frontend import QueueManager, FrontEndAjax
 
 
-def setUpLogFile(application, filename):
+def getRotatableLogFileObserver(filename):
     """Setup a L{LogFile} for the given application."""
     logfile = LogFile.fromFullPath(
         filename, rotateLength=None, defaultMode=0644)
@@ -26,7 +35,24 @@ def setUpLogFile(application, filename):
         logfile.reopen()
 
     signal.signal(signal.SIGUSR1, signal_handler)
-    application.setComponent(ILogObserver, FileLogObserver(logfile).emit)
+    return FileLogObserver(logfile)
+
+
+def setUpOopsHandler(options):
+    """Add OOPS handling based on the passed command line options."""
+    config = oops_config()
+
+    # Add the oops publisher that writes files in the configured place
+    # if the command line option was set.
+    if options.get["oops-dir"]:
+        repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
+        config.publishers.append(defer_publisher(repo))
+
+    # Add the log file observers. The second observer is to put OOPSes
+    # in the log too.
+    logfile = getRotatableLogFileObserver(options["logfile"])
+    observer = OOPSObserver(config, logfile.emit)
+    addObserver(observer.emit)
 
 
 class Options(usage.Options):
@@ -36,9 +62,11 @@ class Options(usage.Options):
         ["brokerhost", "h", '127.0.0.1', "Broker host"],
         ["brokeruser", "u", None, "Broker user"],
         ["brokerpassword", "a", None, "Broker password"],
-        ["brokervhost", "v", '127.0.0.1', "Broker vhost"],
+        ["brokervhost", "v", '/', "Broker vhost"],
         ["frontendport", "f", None, "Frontend port"],
         ["prefix", "x", 'XXX', "Queue prefix"],
+        ["oops-dir", "r", None, "Where to write OOPS reports"],
+        ["oops-prefix", "o", "LONGPOLL", "String prefix for OOPS IDs"],
         ]
 
     def postOptions(self):
@@ -65,6 +93,8 @@ class AMQServiceMaker(object):
         # See Twisted bug 638.
         #if options["logfile"]:
         #    setUpLogFile(application, options["logfile"])
+
+        setUpOopsHandler(options)
 
         broker_port = options["brokerport"]
         broker_host = options["brokerhost"]
