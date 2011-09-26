@@ -11,6 +11,7 @@ from oops_twisted import (
     defer_publisher,
     OOPSObserver,
     )
+import setproctitle
 from twisted.application.internet import TCPServer, TCPClient
 from twisted.application.service import IServiceMaker, MultiService
 from twisted.plugin import IPlugin
@@ -90,6 +91,9 @@ class AMQServiceMaker(object):
 
     def makeService(self, options):
         """Construct a TCPServer and TCPClient. """
+        setproctitle.setproctitle(
+            "txlongpoll: accepting connections on %s" % 
+                options["frontendport"])
         setUpOopsHandler(options)
 
         broker_port = options["brokerport"]

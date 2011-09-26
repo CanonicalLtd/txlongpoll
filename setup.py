@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='txlongpoll',
-    version="0.2.3",
+    version="0.2.4",
     packages=find_packages('.') + ['twisted.plugins'],
     include_package_data=True,
     zip_safe=False,
@@ -17,6 +17,7 @@ setup(
     install_requires=[
         'oops_datedir_repo',
         'oops_twisted',
+        'setproctitle',
         'Twisted',
         'txamqp',
         'zope.interface',
