@@ -23,4 +23,4 @@ Testing
 Running
 -------
 
- $ bin/twistd amqp-longpoll
+ $ bin/txlongpoll amqp-longpoll

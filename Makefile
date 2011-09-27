@@ -12,7 +12,7 @@ BUILDOUT_CFG = buildout.cfg
 #
 # NB: It's important BUILDOUT_BIN only mentions things genuinely
 # produced by buildout.
-BUILDOUT_BIN = $(PY) bin/tags bin/test bin/twistd
+BUILDOUT_BIN = $(PY) bin/tags bin/test bin/txlongpoll
 
 
 default: check
