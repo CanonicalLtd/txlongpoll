@@ -37,7 +37,7 @@ $(subst $(PY),,$(BUILDOUT_BIN)): $(PY)
 build: $(BUILDOUT_BIN)
 
 
-dist: setup.py
+dist: $(PY)
 	$(PY) setup.py egg_info -r sdist
 
 
@@ -51,10 +51,12 @@ clean_buildout:
 	$(RM) -r develop-eggs
 	$(RM) .installed.cfg
 	$(RM) -r build
+	$(RM) -r dist
 
 
 clean_eggs:
 	$(RM) -r download-cache
+	$(RM) -r *.egg-info
 	$(RM) -r eggs
 
 
