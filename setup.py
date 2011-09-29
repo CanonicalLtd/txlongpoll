@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='txlongpoll',
-    version="0.2.5",
+    version="0.2.6",
     packages=find_packages('.') + ['twisted.plugins'],
     include_package_data=True,
     zip_safe=False,
