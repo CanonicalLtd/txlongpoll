@@ -21,9 +21,13 @@ from txlongpoll.testing.client import AMQTest, QueueWrapper
 
 class QueueManagerTest(AMQTest):
 
+    prefix = None
+    tag_prefix = ""
+    queue_prefix = ""
+
     def setUp(self):
         self.clock = Clock()
-        self.manager = QueueManager("test")
+        self.manager = QueueManager(self.prefix)
         return AMQTest.setUp(self)
 
     def test_wb_connected(self):
@@ -46,16 +50,16 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1", auto_delete=True)
+            queue=self.queue_prefix + "uuid1", auto_delete=True)
         content = Content("some content")
 
         yield self.channel.basic_publish(
-            routing_key="test.notifications-queue.uuid1",
+            routing_key=self.queue_prefix + "uuid1",
             content=content)
         message = yield self.manager.get_message("uuid1", "0")
         self.assertEquals(message[0], "some content")
 
-        self.assertNotIn("test.notifications-tag.uuid1.0", self.client.queues)
+        self.assertNotIn(self.tag_prefix + "uuid1.0", self.client.queues)
 
     @inlineCallbacks
     def test_reject_message(self):
@@ -65,11 +69,11 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
         content = Content("some content")
 
         yield self.channel.basic_publish(
-            routing_key="test.notifications-queue.uuid1",
+            routing_key=self.queue_prefix + "uuid1",
             content=content)
         message, tag = yield self.manager.get_message("uuid1", "0")
         yield self.manager.reject_message(tag)
@@ -84,16 +88,16 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
         content = Content("some content")
 
         yield self.channel.basic_publish(
-            routing_key="test.notifications-queue.uuid1",
+            routing_key=self.queue_prefix + "uuid1",
             content=content)
         message, tag = yield self.manager.get_message("uuid1", "0")
         yield self.manager.ack_message(tag)
 
-        reply = yield self.client.queue("test.notifications-tag.uuid1.1")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.1")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
 
@@ -127,10 +131,10 @@ class QueueManagerTest(AMQTest):
         self.amq_disconnected = self.manager.disconnected
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
         content = Content("some content")
 
-        reply = yield self.client.queue("test.notifications-tag.uuid1.0")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.0")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
 
@@ -147,7 +151,7 @@ class QueueManagerTest(AMQTest):
 
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.basic_publish(
-            routing_key="test.notifications-queue.uuid1",
+            routing_key=self.queue_prefix + "uuid1",
             content=content)
 
         message = yield d1
@@ -161,9 +165,9 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
 
-        reply = yield self.client.queue("test.notifications-tag.uuid1.0")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.0")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
 
@@ -173,7 +177,7 @@ class QueueManagerTest(AMQTest):
         self.clock.advance(self.manager.message_timeout + 1)
         yield assert_fails_with(d, Empty)
 
-        self.assertNotIn("test.notifications-tag.uuid1.0", self.client.queues)
+        self.assertNotIn(self.tag_prefix + "uuid1.0", self.client.queues)
 
     @inlineCallbacks
     def test_wb_timeout_race_condition(self):
@@ -184,17 +188,17 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
         content = Content("some content")
 
-        reply = yield self.client.queue("test.notifications-tag.uuid1.0")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.0")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
         old_timeout = reply._timeout
 
         def timeout(deferred):
             self.channel.basic_publish(
-                routing_key="test.notifications-queue.uuid1",
+                routing_key=self.queue_prefix + "uuid1",
                 content=content)
             old_timeout(deferred)
 
@@ -216,9 +220,9 @@ class QueueManagerTest(AMQTest):
         """
         yield self.manager.connected((self.client, self.channel))
         yield self.channel.queue_declare(
-            queue="test.notifications-queue.uuid1")
+            queue=self.queue_prefix + "uuid1")
 
-        reply = yield self.client.queue("test.notifications-tag.uuid1.0")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.0")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
 
@@ -229,7 +233,7 @@ class QueueManagerTest(AMQTest):
         yield assert_fails_with(d1, Empty)
 
         # Let's wrap the queue again
-        reply = yield self.client.queue("test.notifications-tag.uuid1.1")
+        reply = yield self.client.queue(self.tag_prefix + "uuid1.1")
         reply.clock = self.clock
         event_queue = QueueWrapper(reply).event_queue
 
@@ -238,6 +242,13 @@ class QueueManagerTest(AMQTest):
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
         yield assert_fails_with(d2, Empty)
+
+
+class QueueManagerTestWithPrefix(QueueManagerTest):
+
+    prefix = "test"
+    tag_prefix = "test.notifications-tag."
+    queue_prefix = "test.notifications-queue."
 
 
 class FakeMessageQueue(object):

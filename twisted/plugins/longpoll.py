@@ -76,7 +76,7 @@ class Options(usage.Options):
         ["brokerpassword", "a", None, "Broker password"],
         ["brokervhost", "v", '/', "Broker vhost"],
         ["frontendport", "f", None, "Frontend port"],
-        ["prefix", "x", 'XXX', "Queue prefix"],
+        ["prefix", "x", None, "Queue prefix"],
         ["oops-dir", "r", None, "Where to write OOPS reports"],
         ["oops-prefix", "o", "LONGPOLL", "String prefix for OOPS IDs"],
         ]
