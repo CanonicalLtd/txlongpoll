@@ -42,11 +42,19 @@ class QueueManager(object):
     # is 5 minutes.
     message_timeout = 270
 
-    def __init__(self, prefix):
+    def __init__(self, prefix=None):
         self._prefix = prefix
         self._channel = None
         self._client = None
         self._pending_requests = []
+        # Preserve compatibility by using special forms for naming when a
+        # prefix is specified.
+        if self._prefix is not None and len(self._prefix) != 0:
+            self._tag_form = "%s.notifications-tag.%%s.%%s" % self._prefix
+            self._queue_form = "%s.notifications-queue.%%s" % self._prefix
+        else:
+            self._tag_form = "%s.%s"
+            self._queue_form = "%s"
 
     def disconnected(self):
         """
@@ -93,11 +101,10 @@ class QueueManager(object):
         """
         if self._channel is None:
             yield self._wait_for_connection()
-        tag = "%s.notifications-tag.%s.%s" % (self._prefix, uuid, sequence)
+        tag = self._tag_form % (uuid, sequence)
         try:
             yield self._channel.basic_consume(
-                consumer_tag=tag,
-                queue="%s.notifications-queue.%s" % (self._prefix, uuid))
+                consumer_tag=tag, queue=(self._queue_form % uuid))
 
             log.msg("Consuming from queue '%s'" % uuid)
 
@@ -154,7 +161,7 @@ class QueueManager(object):
             in the queue.
         """
         if self._client is not None:
-            tag = "%s.notifications-tag.%s.%s" % (self._prefix, uuid, sequence)
+            tag = self._tag_form % (uuid, sequence)
             queue = yield self._client.queue(tag)
             queue.put(Empty)
 
