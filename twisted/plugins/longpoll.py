@@ -2,6 +2,7 @@
 # the GNU Affero General Public License version 3 (see the file LICENSE).
 
 import signal
+import sys
 
 from zope.interface import implements
 
@@ -13,7 +14,11 @@ from oops_twisted import (
     )
 import setproctitle
 from twisted.application.internet import TCPServer, TCPClient
-from twisted.application.service import IServiceMaker, MultiService
+from twisted.application.service import (
+    IServiceMaker,
+    MultiService,
+    )
+from twisted.internet import reactor
 from twisted.plugin import IPlugin
 from twisted.python import log, usage
 from twisted.python.log import (
@@ -29,17 +34,21 @@ from txlongpoll.frontend import QueueManager, FrontEndAjax
 
 def getRotatableLogFileObserver(filename):
     """Setup a L{LogFile} for the given application."""
-    logfile = LogFile.fromFullPath(
-        filename, rotateLength=None, defaultMode=0644)
+    if filename != '-':
+        logfile = LogFile.fromFullPath(
+            filename, rotateLength=None, defaultMode=0644)
 
-    def signal_handler(*args):
-        logfile.reopen()
+        def signal_handler(*args):
+            reactor.callFromThread(logfile.reopen)
 
-    signal.signal(signal.SIGUSR1, signal_handler)
+        signal.signal(signal.SIGUSR1, signal_handler)
+    else:
+        logfile = sys.stdout
+
     return FileLogObserver(logfile)
 
 
-def setUpOopsHandler(options):
+def setUpOopsHandler(options, logfile):
     """Add OOPS handling based on the passed command line options."""
     config = oops_config()
 
@@ -49,10 +58,7 @@ def setUpOopsHandler(options):
         repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
         config.publishers.append(defer_publisher(repo.publish))
 
-    # Add the log file observers. The second observer is to put OOPSes
-    # in the log too.
-    logfile = getRotatableLogFileObserver(options["logfile"])
-    observer = OOPSObserver(config, logfile.emit)
+    observer = OOPSObserver(config, logfile)
     addObserver(observer.emit)
 
 
@@ -94,7 +100,9 @@ class AMQServiceMaker(object):
         setproctitle.setproctitle(
             "txlongpoll: accepting connections on %s" % 
                 options["frontendport"])
-        setUpOopsHandler(options)
+
+        logfile = getRotatableLogFileObserver(options["logfile"])
+        setUpOopsHandler(options, logfile)
 
         broker_port = options["brokerport"]
         broker_host = options["brokerhost"]
