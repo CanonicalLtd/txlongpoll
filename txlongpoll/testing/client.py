@@ -1,6 +1,7 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from rabbitfixture.server import RabbitServer
 from testresources import (
     FixtureResource,
     ResourcedTestCase,
@@ -9,13 +10,14 @@ from testtools import TestCase
 from testtools.deferredruntest import (
     AsynchronousDeferredRunTestForBrokenTwisted,
     )
-from twisted.internet.defer import Deferred, inlineCallbacks, DeferredQueue
 from twisted.internet import reactor
-
+from twisted.internet.defer import (
+    Deferred,
+    DeferredQueue,
+    inlineCallbacks,
+    )
 from txamqp.client import Closed
-
 from txlongpoll.client import AMQFactory
-from rabbitfixture.server import RabbitServer
 
 
 class QueueWrapper(object):

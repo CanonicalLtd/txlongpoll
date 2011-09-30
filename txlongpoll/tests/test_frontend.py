@@ -1,22 +1,38 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from unittest import defaultTestLoader
-import json
 from cStringIO import StringIO
+import json
+from unittest import defaultTestLoader
 
 from testtools import TestCase
 from testtools.deferredruntest import assert_fails_with
-from twisted.internet.task import Clock, deferLater
-from twisted.internet.defer import inlineCallbacks, succeed, fail, Deferred
 from twisted.internet import reactor
-
-from txamqp.protocol import AMQChannel, AMQClient
-from txamqp.queue import Empty
+from twisted.internet.defer import (
+    Deferred,
+    fail,
+    inlineCallbacks,
+    succeed,
+    )
+from twisted.internet.task import (
+    Clock,
+    deferLater,
+    )
 from txamqp.content import Content
-
-from txlongpoll.frontend import QueueManager, FrontEndAjax, NotFound
-from txlongpoll.testing.client import AMQTest, QueueWrapper
+from txamqp.protocol import (
+    AMQChannel,
+    AMQClient,
+    )
+from txamqp.queue import Empty
+from txlongpoll.frontend import (
+    FrontEndAjax,
+    NotFound,
+    QueueManager,
+    )
+from txlongpoll.testing.client import (
+    AMQTest,
+    QueueWrapper,
+    )
 
 
 class QueueManagerTest(AMQTest):

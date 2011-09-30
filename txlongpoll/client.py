@@ -7,13 +7,12 @@ Asynchronous client for AMQP using txAMQP.
 
 import os.path
 
-from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet.defer import maybeDeferred
-
-from txamqp.protocol import AMQClient
+from twisted.internet.protocol import ReconnectingClientFactory
 from txamqp.client import TwistedDelegate
-from txamqp.spec import load as load_spec
+from txamqp.protocol import AMQClient
 from txamqp.queue import Closed
+from txamqp.spec import load as load_spec
 
 
 class AMQClientWithCallback(AMQClient):

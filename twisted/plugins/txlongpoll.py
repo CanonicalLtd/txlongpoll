@@ -1,10 +1,10 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under
 # the GNU Affero General Public License version 3 (see the file LICENSE).
 
+from __future__ import absolute_import
+
 import signal
 import sys
-
-from zope.interface import implements
 
 from oops_datedir_repo import DateDirRepo
 from oops_twisted import (
@@ -13,23 +13,32 @@ from oops_twisted import (
     OOPSObserver,
     )
 import setproctitle
-from twisted.application.internet import TCPServer, TCPClient
+from twisted.application.internet import (
+    TCPClient,
+    TCPServer,
+    )
 from twisted.application.service import (
     IServiceMaker,
     MultiService,
     )
 from twisted.internet import reactor
 from twisted.plugin import IPlugin
-from twisted.python import log, usage
+from twisted.python import (
+    log,
+    usage,
+    )
 from twisted.python.log import (
     addObserver,
-    FileLogObserver
+    FileLogObserver,
     )
 from twisted.python.logfile import LogFile
 from twisted.web.server import Site
-
 from txlongpoll.client import AMQFactory
-from txlongpoll.frontend import QueueManager, FrontEndAjax
+from txlongpoll.frontend import (
+    FrontEndAjax,
+    QueueManager,
+    )
+from zope.interface import implements
 
 
 def getRotatableLogFileObserver(filename):
@@ -89,16 +98,19 @@ class Options(usage.Options):
 
 class AMQServiceMaker(object):
     """Create an asynchronous frontend server for AMQP."""
+
     implements(IServiceMaker, IPlugin)
-    tapname = "amqp-longpoll"
-    description = "An AMQP long-poll HTTP service."
 
     options = Options
 
+    def __init__(self, name, description):
+        self.tapname = name
+        self.description = description
+
     def makeService(self, options):
-        """Construct a TCPServer and TCPClient. """
+        """Construct a TCPServer and TCPClient."""
         setproctitle.setproctitle(
-            "txlongpoll: accepting connections on %s" % 
+            "txlongpoll: accepting connections on %s" %
                 options["frontendport"])
 
         logfile = getRotatableLogFileObserver(options["logfile"])
@@ -128,8 +140,14 @@ class AMQServiceMaker(object):
         return services
 
 
-# Now construct an object which *provides* the relevant interfaces
-# The name of this variable is irrelevant, as long as there is *some*
-# name bound to a provider of IPlugin and IServiceMaker.
+# Now construct objects which *provide* the relevant interfaces. The name of
+# these variables is irrelevant, as long as there are *some* names bound to
+# providers of IPlugin and IServiceMaker.
 
-serviceMaker = AMQServiceMaker()
+service_amqp_longpoll = AMQServiceMaker(
+    "amqp-longpoll", "An AMQP -> HTTP long-poll bridge. *Note* that "
+    "the `amqp-longpoll' name is deprecated; please use `txlongpoll' "
+    "instead.")
+
+service_txlongpoll = AMQServiceMaker(
+    "txlongpoll", "An AMQP -> HTTP long-poll bridge.")
