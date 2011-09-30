@@ -18,7 +18,7 @@ setup(
         'oops_datedir_repo',
         'oops_twisted >= 0.0.3',
         'setproctitle',
-        'Twisted == 11.0.0_and_r32397',
+        'Twisted',
         'txamqp',
         'zope.interface',
         ],

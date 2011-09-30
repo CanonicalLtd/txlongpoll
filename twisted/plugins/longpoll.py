@@ -15,7 +15,6 @@ from oops_twisted import (
 import setproctitle
 from twisted.application.internet import TCPServer, TCPClient
 from twisted.application.service import (
-    Application,
     IServiceMaker,
     MultiService,
     )
@@ -28,7 +27,6 @@ from twisted.python.log import (
     )
 from twisted.python.logfile import LogFile
 from twisted.web.server import Site
-from twisted.plugins.longpolllogger import rotatable_log
 
 from txlongpoll.client import AMQFactory
 from txlongpoll.frontend import QueueManager, FrontEndAjax
@@ -60,10 +58,7 @@ def setUpOopsHandler(options, logfile):
         repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
         config.publishers.append(defer_publisher(repo.publish))
 
-    # This just makes everything get logged twice.  We need oops_twisted
-    # to only log the OOPSes to the fallback observer.
-    # observer = OOPSObserver(config, logfile)
-    observer = OOPSObserver(config)
+    observer = OOPSObserver(config, logfile)
     addObserver(observer.emit)
 
 
@@ -106,14 +101,8 @@ class AMQServiceMaker(object):
             "txlongpoll: accepting connections on %s" % 
                 options["frontendport"])
 
-        # rotatable_log() depends on twistd being called with "--logger="
-        # Here, we're priming it with the right log file name before
-        # the twistd apoplication code imports it and calls it.
-        logfile = rotatable_log(options["logfile"])
-
+        logfile = getRotatableLogFileObserver(options["logfile"])
         setUpOopsHandler(options, logfile)
-        application = Application(self.tapname)
-        application.addComponent(logfile)
 
         broker_port = options["brokerport"]
         broker_host = options["brokerhost"]
