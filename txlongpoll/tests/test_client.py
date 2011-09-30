@@ -5,15 +5,16 @@
 Tests for C{AMQFactory}.
 """
 
-from unittest import TestCase, defaultTestLoader
+from unittest import (
+    defaultTestLoader,
+    TestCase,
+    )
 
 from testtools.deferredruntest import flush_logged_errors
 from twisted.internet.defer import Deferred
-
-from txamqp.spec import Spec
 from txamqp.protocol import AMQChannel
 from txamqp.queue import Closed
-
+from txamqp.spec import Spec
 from txlongpoll.client import AMQFactory
 from txlongpoll.testing.client import AMQTest
 

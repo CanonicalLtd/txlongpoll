@@ -5,8 +5,6 @@ from __future__ import absolute_import
 
 import signal
 
-from zope.interface import implements
-
 from oops_datedir_repo import DateDirRepo
 from oops_twisted import (
     Config as oops_config,
@@ -14,19 +12,31 @@ from oops_twisted import (
     OOPSObserver,
     )
 import setproctitle
-from twisted.application.internet import TCPServer, TCPClient
-from twisted.application.service import IServiceMaker, MultiService
+from twisted.application.internet import (
+    TCPClient,
+    TCPServer,
+    )
+from twisted.application.service import (
+    IServiceMaker,
+    MultiService,
+    )
 from twisted.plugin import IPlugin
-from twisted.python import log, usage
+from twisted.python import (
+    log,
+    usage,
+    )
 from twisted.python.log import (
     addObserver,
-    FileLogObserver
+    FileLogObserver,
     )
 from twisted.python.logfile import LogFile
 from twisted.web.server import Site
-
 from txlongpoll.client import AMQFactory
-from txlongpoll.frontend import QueueManager, FrontEndAjax
+from txlongpoll.frontend import (
+    FrontEndAjax,
+    QueueManager,
+    )
+from zope.interface import implements
 
 
 def getRotatableLogFileObserver(filename):

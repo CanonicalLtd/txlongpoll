@@ -7,16 +7,25 @@ Async frontend server for serving answers from background processor.
 
 import json
 
-from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
+from twisted.internet.defer import (
+    Deferred,
+    inlineCallbacks,
+    returnValue,
+    )
 from twisted.python import log
-
+from twisted.web.http import (
+    BAD_REQUEST,
+    INTERNAL_SERVER_ERROR,
+    NOT_FOUND,
+    REQUEST_TIMEOUT,
+    )
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
-from twisted.web.http import (
-    BAD_REQUEST, INTERNAL_SERVER_ERROR, REQUEST_TIMEOUT, NOT_FOUND)
-
-from txamqp.queue import Empty, Closed as QueueClosed
 from txamqp.client import Closed
+from txamqp.queue import (
+    Closed as QueueClosed,
+    Empty,
+    )
 
 
 __all__ = ["QueueManager", "FrontEndAjax"]
