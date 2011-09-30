@@ -1,6 +1,8 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under
 # the GNU Affero General Public License version 3 (see the file LICENSE).
 
+from __future__ import absolute_import
+
 import signal
 
 from zope.interface import implements
@@ -83,16 +85,19 @@ class Options(usage.Options):
 
 class AMQServiceMaker(object):
     """Create an asynchronous frontend server for AMQP."""
+
     implements(IServiceMaker, IPlugin)
-    tapname = "amqp-longpoll"
-    description = "An AMQP long-poll HTTP service."
 
     options = Options
 
+    def __init__(self, name, description):
+        self.tapname = name
+        self.description = description
+
     def makeService(self, options):
-        """Construct a TCPServer and TCPClient. """
+        """Construct a TCPServer and TCPClient."""
         setproctitle.setproctitle(
-            "txlongpoll: accepting connections on %s" % 
+            "txlongpoll: accepting connections on %s" %
                 options["frontendport"])
         setUpOopsHandler(options)
 
@@ -120,8 +125,14 @@ class AMQServiceMaker(object):
         return services
 
 
-# Now construct an object which *provides* the relevant interfaces
-# The name of this variable is irrelevant, as long as there is *some*
-# name bound to a provider of IPlugin and IServiceMaker.
+# Now construct objects which *provide* the relevant interfaces. The name of
+# these variables is irrelevant, as long as there are *some* names bound to
+# providers of IPlugin and IServiceMaker.
 
-serviceMaker = AMQServiceMaker()
+service_amqp_longpoll = AMQServiceMaker(
+    "amqp-longpoll", "An AMQP -> HTTP long-poll bridge. *Note* that "
+    "the `amqp-longpoll' name is deprecated; please use `txlongpoll' "
+    "instead.")
+
+service_txlongpoll = AMQServiceMaker(
+    "txlongpoll", "An AMQP -> HTTP long-poll bridge.")
