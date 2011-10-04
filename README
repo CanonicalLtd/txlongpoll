@@ -23,4 +23,4 @@ Testing
 Running
 -------
 
- $ bin/txlongpoll txlongpoll
+ $ bin/twistd txlongpoll
