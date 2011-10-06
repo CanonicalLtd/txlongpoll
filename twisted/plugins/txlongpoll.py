@@ -67,7 +67,7 @@ def setUpOopsHandler(options, logfile):
         repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
         config.publishers.append(defer_publisher(repo.publish))
 
-    observer = OOPSObserver(config, logfile)
+    observer = OOPSObserver(config, logfile.emit)
     addObserver(observer.emit)
 
 
