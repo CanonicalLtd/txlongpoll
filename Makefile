@@ -37,6 +37,10 @@ $(subst $(PY),,$(BUILDOUT_BIN)): $(PY)
 build: $(BUILDOUT_BIN)
 
 
+update-paths: bin/buildout
+	bin/buildout -oN
+
+
 dist: $(PY)
 	$(PY) setup.py egg_info -r sdist
 
@@ -65,4 +69,4 @@ clean: clean_buildout
 clean_all: clean_buildout clean_eggs
 
 
-.PHONY: build check default dist
+.PHONY: build check default dist update-paths
