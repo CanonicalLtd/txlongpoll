@@ -69,4 +69,6 @@ clean: clean_buildout
 clean_all: clean_buildout clean_eggs
 
 
-.PHONY: build check default dist update-paths
+.PHONY: \
+  build check clean clean_all clean_buildout \
+  clean_eggs default dist update-paths
