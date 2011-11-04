@@ -22,7 +22,7 @@ setup(
         'oops_twisted >= 0.0.3',
         'setproctitle',
         'Twisted',
-        'txamqp',
+        'txAMQP >= 0.5',
         'zope.interface',
         ],
     extras_require=dict(
