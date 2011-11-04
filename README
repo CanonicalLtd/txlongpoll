@@ -1,23 +1,45 @@
 Generic long poll server used by Launchpad and Landscape.
 
 
-Building
---------
+Dependencies
+------------
+
+By default txlongpoll attempts to build without going to the network;
+instead it tries to find all dependencies from download-cache/dist,
+and you must download all the dependencies yourself.
+
+If you prefer for buildout to find dependencies from PyPI then comment
+out the ``install-from-cache = true`` line in buildout.cfg.
+
+To run the tests you may also need lp:rabbitfixture (bzr branch
+lp:rabbitfixture). Build it and drop the egg in download-cache/dist.
+You may also need to do the same for testresources-0.2.4_r58 until it
+reaches PyPI.
 
 txlongpoll needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
 
-You also need to get lp:rabbitfixture, build it and drop the egg in
-./download-cache/dist in order for txlongpoll to build.  You will also possibly
-need to do the same for testresources-0.2.4_r58 until it reaches PyPI.
+
+Building
+--------
 
  $ make build
+
+will build only those parts needed to run txlongpoll. No support for
+tags or testing.
 
 
 Testing
 -------
 
- $ bin/test
+ $ make check
+
+will build all the test-related parts of txlongpoll and then do a full
+test run, but
+
+ $ make bin/test
+
+will just do the first part.
 
 
 Running
