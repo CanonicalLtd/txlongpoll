@@ -11,15 +11,20 @@ BUILDOUT := $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
 default: check
 
 
-build: bin/py bin/twistd
+build: bin/twistd
+
+
+# When a built tree is moved this updates absolute paths.
+build-update-paths:
+	$(BUILDOUT)
 
 
 check: bin/test
 	bin/test -vv
 
 
-dist: bin/py
-	bin/py setup.py egg_info -r sdist
+dist: $(BUILDOUT_BIN)
+	$(BUILDOUT) setup setup.py egg_info -r sdist
 
 
 TAGS: bin/tags
@@ -28,10 +33,6 @@ TAGS: bin/tags
 
 tags: bin/tags
 	bin/tags --ctags-vi
-
-
-update-paths:
-	$(BUILDOUT)
 
 
 download-cache:
@@ -50,7 +51,7 @@ $(BUILDOUT_BIN): download-cache eggs
 	touch --no-create $@
 
 
-bin/py bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
+bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
 	$(BUILDOUT) install runtime
 
 
@@ -84,5 +85,5 @@ clean_all: clean_buildout clean_eggs
 
 
 .PHONY: \
-    build check clean clean_all clean_buildout clean_eggs default \
-    dist update-paths
+    build build-update-paths check clean clean_all clean_buildout \
+    clean_eggs default dist
