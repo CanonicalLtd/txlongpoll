@@ -76,7 +76,7 @@ def setUpOopsHandler(options, logfile):
             host = "%s:%s" % (host, options["brokerport"])
         rabbit_connect = partial(amqp.Connection,
             host=host, userid=options["brokeruser"],
-            password=options["brokerpassword",
+            password=options["brokerpassword"],
             virtual_host=options["brokervhost"])
         amqp_publisher = Publisher(
                 rabbit_connect, oops_exchange, oops_key)
@@ -119,8 +119,8 @@ class Options(usage.Options):
                 self[int_arg] = int(self[int_arg])
             except (TypeError, ValueError):
                 raise usage.UsageError("--%s must be an integer." % int_arg)
-        if not self["oops-reporter"] and
-            (self["oops-exchange"] or self["oops-dir"]):
+        if not self["oops-reporter"] and (
+            self["oops-exchange"] or self["oops-dir"]):
             raise usage.UsageError("A reporter must be supplied to identify "
                 "reports from this service from other OOPS reports.")
 
