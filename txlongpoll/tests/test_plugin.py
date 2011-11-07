@@ -26,6 +26,7 @@ def options_diff(a, b):
 
 
 class OptionsTest(TestCase):
+    """Tests for `txlongpoll.plugin.Options`."""
 
     def test_defaults(self):
         options = Options()

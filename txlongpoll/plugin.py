@@ -122,8 +122,9 @@ class Options(usage.Options):
                 raise usage.UsageError("--%s must be an integer." % int_arg)
         if not self["oops-reporter"] and (
             self["oops-exchange"] or self["oops-dir"]):
-            raise usage.UsageError("A reporter must be supplied to identify "
-                "reports from this service from other OOPS reports.")
+            raise usage.UsageError(
+                "A reporter must be supplied to identify reports "
+                "from this service from other OOPS reports.")
 
 
 class AMQServiceMaker(object):
