@@ -12,9 +12,9 @@ If you prefer for buildout to find dependencies from PyPI then comment
 out the ``install-from-cache = true`` line in buildout.cfg.
 
 To run the tests you may also need lp:rabbitfixture (bzr branch
-lp:rabbitfixture). Build it and drop the egg in download-cache/dist.
-You may also need to do the same for testresources-0.2.4_r58 until it
-reaches PyPI.
+lp:rabbitfixture). Build an sdist tarball and drop it into
+download-cache/dist. You may also need to do the same for
+testresources-0.2.4_r58 until it reaches PyPI.
 
 txlongpoll needs a recent RabbitMQ with support for rejection. Maverick's
 1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
