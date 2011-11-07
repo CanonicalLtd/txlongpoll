@@ -22,8 +22,8 @@ build-update-paths:
 	$(BUILDOUT)
 
 
-check: bin/test
-	bin/test -vv
+check: bin/testpy
+	bin/testpy -m subunit/run -- discover
 
 
 dist: $(BUILDOUT_BIN)
@@ -58,7 +58,7 @@ bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
 	$(BUILDOUT) install runtime
 
 
-bin/test: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
+bin/testpy: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
 	$(BUILDOUT) install test
 
 
