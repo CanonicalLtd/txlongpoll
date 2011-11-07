@@ -1,15 +1,30 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from cStringIO import StringIO
+from functools import partial
 from unittest import defaultTestLoader
 
+from fixtures import TempDir
+from oops_twisted import OOPSObserver
 from testtools import TestCase
-from testtools.matchers import Raises, MatchesException
-
-from functools import partial
-
-from txlongpoll.plugin import Options
+from testtools.content import (
+    Content,
+    UTF8_TEXT,
+    )
+from testtools.matchers import (
+    MatchesException,
+    Raises,
+    )
+from twisted.python.log import (
+    FileLogObserver,
+    theLogPublisher,
+    )
 from twisted.python.usage import UsageError
+from txlongpoll.plugin import (
+    Options,
+    setUpOOPSHandler,
+    )
 
 
 def options_diff(a, b):
@@ -25,7 +40,7 @@ def options_diff(a, b):
     return diff
 
 
-class OptionsTest(TestCase):
+class TestOptions(TestCase):
     """Tests for `txlongpoll.plugin.Options`."""
 
     def test_defaults(self):
@@ -134,6 +149,63 @@ class OptionsTest(TestCase):
         self.assertThat(
             partial(options.parseOptions, arguments),
             Raises(expected))
+
+
+class TestSetUpOOPSHandler(TestCase):
+    """Tests for `txlongpoll.plugin.setUpOOPSHandler`."""
+
+    def setUp(self):
+        super(TestSetUpOOPSHandler, self).setUp()
+        self.observers = theLogPublisher.observers[:]
+        self.logfile = StringIO()
+        self.addDetail("log", Content(UTF8_TEXT, self.logfile.getvalue))
+        self.log = FileLogObserver(self.logfile)
+
+    def tearDown(self):
+        super(TestSetUpOOPSHandler, self).tearDown()
+        theLogPublisher.observers[:] = self.observers
+
+    def makeObserver(self, settings):
+        options = Options()
+        options["brokerpassword"] = "Hoskins"
+        options["brokeruser"] = "Bob"
+        options["frontendport"] = 1234
+        options.update(settings)
+        observer = setUpOOPSHandler(options, self.log)
+        return options, observer
+
+    def test_minimal(self):
+        options, observer = self.makeObserver({})
+        self.assertIsInstance(observer, OOPSObserver)
+        self.assertEqual([], observer.config.publishers)
+        self.assertEqual(
+            {"reporter": options.defaults["oops-reporter"]},
+            observer.config.template)
+
+    def test_with_all_the_things(self):
+        settings = {
+            "oops-exchange": "Frank",
+            "oops-reporter": "Sidebottom",
+            "oops-dir": self.useFixture(TempDir()).path,
+            }
+        options, observer = self.makeObserver(settings)
+        self.assertIsInstance(observer, OOPSObserver)
+        self.assertEqual(2, len(observer.config.publishers))
+        self.assertEqual(
+            {"reporter": "Sidebottom"},
+            observer.config.template)
+
+    def test_with_some_of_the_things(self):
+        settings = {
+            "oops-exchange": "Frank",
+            "oops-reporter": "Sidebottom",
+            }
+        options, observer = self.makeObserver(settings)
+        self.assertIsInstance(observer, OOPSObserver)
+        self.assertEqual(1, len(observer.config.publishers))
+        self.assertEqual(
+            {"reporter": "Sidebottom"},
+            observer.config.template)
 
 
 def test_suite():

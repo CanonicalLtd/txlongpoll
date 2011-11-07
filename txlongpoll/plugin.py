@@ -60,7 +60,7 @@ def getRotatableLogFileObserver(filename):
     return FileLogObserver(logfile)
 
 
-def setUpOopsHandler(options, logfile):
+def setUpOOPSHandler(options, logfile):
     """Add OOPS handling based on the passed command line options."""
     config = oops_config()
 
@@ -92,6 +92,7 @@ def setUpOopsHandler(options, logfile):
 
     observer = OOPSObserver(config, logfile.emit)
     addObserver(observer.emit)
+    return observer
 
 
 class Options(usage.Options):
@@ -145,7 +146,7 @@ class AMQServiceMaker(object):
                 options["frontendport"])
 
         logfile = getRotatableLogFileObserver(options["logfile"])
-        setUpOopsHandler(options, logfile)
+        setUpOOPSHandler(options, logfile)
 
         broker_port = options["brokerport"]
         broker_host = options["brokerhost"]
