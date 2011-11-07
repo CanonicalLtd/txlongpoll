@@ -52,14 +52,11 @@ def getRotatableLogFileObserver(filename):
     if filename != '-':
         logfile = LogFile.fromFullPath(
             filename, rotateLength=None, defaultMode=0644)
-
-        def signal_handler(*args):
+        def signal_handler(sig, frame):
             reactor.callFromThread(logfile.reopen)
-
         signal.signal(signal.SIGUSR1, signal_handler)
     else:
         logfile = sys.stdout
-
     return FileLogObserver(logfile)
 
 
@@ -76,12 +73,13 @@ def setUpOopsHandler(options, logfile):
         host = options["brokerhost"]
         if options["brokerport"]:
             host = "%s:%s" % (host, options["brokerport"])
-        rabbit_connect = partial(amqp.Connection,
-            host=host, userid=options["brokeruser"],
+        rabbit_connect = partial(
+            amqp.Connection, host=host,
+            userid=options["brokeruser"],
             password=options["brokerpassword"],
             virtual_host=options["brokervhost"])
         amqp_publisher = Publisher(
-                rabbit_connect, oops_exchange, oops_key)
+            rabbit_connect, oops_exchange, oops_key)
         config.publishers.append(defer_publisher(amqp_publisher))
 
     if options["oops-dir"]:
@@ -97,6 +95,7 @@ def setUpOopsHandler(options, logfile):
 
 
 class Options(usage.Options):
+
     optParameters = [
         ["logfile", "l", "txlongpoll.log", "Logfile name."],
         ["brokerport", "p", 5672, "Broker port"],
