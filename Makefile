@@ -3,9 +3,12 @@
 
 PYTHON = python
 
+BOOTSTRAP_BIN := bootstrap.py
+BOOTSTRAP = PYTHONPATH= $(PYTHON) $(BOOTSTRAP_BIN)
+
 BUILDOUT_BIN := bin/buildout
 BUILDOUT_CFG := buildout.cfg
-BUILDOUT := $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
+BUILDOUT = PYTHONPATH= $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
 
 
 default: check
@@ -44,8 +47,8 @@ eggs:
 
 
 $(BUILDOUT_BIN): download-cache eggs
-	PYTHONPATH= $(PYTHON) bootstrap.py \
-	    --setup-source=ez_setup.py \
+	$(BOOTSTRAP) \
+	    --setup-source=download-cache/dist/ez_setup.py \
 	    --download-base=download-cache/dist \
 	    --eggs=eggs --version=1.5.2
 	touch --no-create $@
