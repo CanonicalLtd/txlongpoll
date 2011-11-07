@@ -33,13 +33,9 @@ from txlongpoll.plugin import (
 def options_diff(a, b):
     diff = []
     for name in sorted(set().union(a, b)):
-        if name in a and name in b:
-            if a[name] != b[name]:
-                diff.append((name, a[name], b[name]))
-        elif name in a:
-            diff.append((name, a[name], None))
-        elif name in b:
-            diff.append((name, None, b[name]))
+        val_a, val_b = a.get(name), b.get(name)
+        if val_a != val_b:
+            diff.append((name, val_a, val_b))
     return diff
 
 
