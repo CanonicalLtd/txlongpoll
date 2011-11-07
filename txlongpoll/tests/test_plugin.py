@@ -102,6 +102,38 @@ class OptionsTest(TestCase):
         self.assertRaises(
             UsageError, options.parseOptions, arguments)
 
+    def test_oops_exchange_without_reporter(self):
+        # It is an error to omit the OOPS reporter if exchange is specified.
+        options = Options()
+        arguments = [
+            "--brokerpassword", "Hoskins",
+            "--brokeruser", "Bob",
+            "--frontendport", "1234",
+            "--oops-exchange", "something",
+            "--oops-reporter", "",
+            ]
+        expected = MatchesException(
+            UsageError, "A reporter must be supplied")
+        self.assertThat(
+            partial(options.parseOptions, arguments),
+            Raises(expected))
+
+    def test_oops_dir_without_reporter(self):
+        # It is an error to omit the OOPS reporter if directory is specified.
+        options = Options()
+        arguments = [
+            "--brokerpassword", "Hoskins",
+            "--brokeruser", "Bob",
+            "--frontendport", "1234",
+            "--oops-dir", "/some/where",
+            "--oops-reporter", "",
+            ]
+        expected = MatchesException(
+            UsageError, "A reporter must be supplied")
+        self.assertThat(
+            partial(options.parseOptions, arguments),
+            Raises(expected))
+
 
 def test_suite():
     return defaultTestLoader.loadTestsFromName(__name__)
