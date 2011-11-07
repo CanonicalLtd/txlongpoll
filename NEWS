@@ -5,3 +5,7 @@ Changes and improvements to txlongpoll, grouped by release.
 
 NEXT
 ----
+
+* OOPS reports can be reported directly over AMQP if the oops-exchange option
+  is given. The oops-prefix option has been renamed to oops-reporter to fit in
+  with the long term terminology oops has adopted. (Robert Collins)
