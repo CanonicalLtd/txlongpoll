@@ -4,7 +4,9 @@
 from unittest import defaultTestLoader
 
 from testtools import TestCase
-from testtools.matchers import Raises, MatchesException, Not
+from testtools.matchers import Raises, MatchesException
+
+from functools import partial
 
 from txlongpoll.plugin import Options
 from twisted.python.usage import UsageError
@@ -47,42 +49,28 @@ class OptionsTest(TestCase):
         # Some options are mandatory.
         options = Options()
 
-        arguments = []
-        expected = MatchesException(
-            UsageError, "--frontendport must be specified")
-        self.assertThat(
-            lambda: options.parseOptions(arguments),
-            Raises(expected))
+        def check_exception(message, *arguments):
+            self.assertThat(
+                partial(options.parseOptions, arguments),
+                Raises(MatchesException(UsageError, message)))
 
-        arguments = [
-            "--frontendport", "1234",
-            ]
-        expected = MatchesException(
-            UsageError, "--brokeruser must be specified")
-        self.assertThat(
-            lambda: options.parseOptions(arguments),
-            Raises(expected))
-
-        arguments = [
+        check_exception(
+            "--frontendport must be specified")
+        check_exception(
+            "--brokeruser must be specified",
+            "--frontendport", "1234")
+        check_exception(
+            "--brokerpassword must be specified",
             "--brokeruser", "Bob",
-            "--frontendport", "1234",
-            ]
-        expected = MatchesException(
-            UsageError, "--brokerpassword must be specified")
-        self.assertThat(
-            lambda: options.parseOptions(arguments),
-            Raises(expected))
+            "--frontendport", "1234")
 
+        # The minimal set of options that must be provided.
         arguments = [
             "--brokerpassword", "Hoskins",
             "--brokeruser", "Bob",
             "--frontendport", "1234",
             ]
-        expected = MatchesException(
-            UsageError, "--brokerpassword must be specified")
-        self.assertThat(
-            lambda: options.parseOptions(arguments),
-            Not(Raises(expected)))
+        options.parseOptions(arguments)  # No error.
 
     def test_parse_int_options(self):
         # Some options are converted to ints.
