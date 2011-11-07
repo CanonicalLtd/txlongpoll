@@ -7,6 +7,7 @@ from unittest import defaultTestLoader
 
 from fixtures import TempDir
 from oops_twisted import OOPSObserver
+from subunit import IsolatedTestCase
 from testtools import TestCase
 from testtools.content import (
     Content,
@@ -16,12 +17,14 @@ from testtools.matchers import (
     MatchesException,
     Raises,
     )
+from twisted.application.service import MultiService
 from twisted.python.log import (
     FileLogObserver,
     theLogPublisher,
     )
 from twisted.python.usage import UsageError
 from txlongpoll.plugin import (
+    AMQServiceMaker,
     Options,
     setUpOOPSHandler,
     )
@@ -206,6 +209,34 @@ class TestSetUpOOPSHandler(TestCase):
         self.assertEqual(
             {"reporter": "Sidebottom"},
             observer.config.template)
+
+
+class TestAMQServiceMaker(IsolatedTestCase, TestCase):
+    """Tests for `txlongpoll.plugin.AMQServiceMaker`."""
+
+    def test_init(self):
+        service_maker = AMQServiceMaker("Harry", "Hill")
+        self.assertEqual("Harry", service_maker.tapname)
+        self.assertEqual("Hill", service_maker.description)
+
+    def makeOptions(self, settings):
+        options = Options()
+        options["brokerpassword"] = "Hoskins"
+        options["brokeruser"] = "Bob"
+        options["frontendport"] = 1234
+        options.update(settings)
+        return options
+
+    def test_makeService(self):
+        options = self.makeOptions({})
+        service_maker = AMQServiceMaker("Harry", "Hill")
+        service = service_maker.makeService(options)
+        self.assertIsInstance(service, MultiService)
+        self.assertEqual(2, len(service.services))
+        client_service, server_service = service.services
+        self.assertEqual(options["brokerhost"], client_service.args[0])
+        self.assertEqual(options["brokerport"], client_service.args[1])
+        self.assertEqual(options["frontendport"], server_service.args[0])
 
 
 def test_suite():
