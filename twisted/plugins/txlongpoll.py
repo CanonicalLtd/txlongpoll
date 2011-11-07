@@ -3,9 +3,13 @@
 
 from __future__ import absolute_import
 
+from functools import partial
 import signal
 import sys
 
+from amqplib import client_0_8 as amqp
+import oops
+from oops_amqp import Publisher
 from oops_datedir_repo import DateDirRepo
 from oops_twisted import (
     Config as oops_config,
@@ -63,9 +67,28 @@ def setUpOopsHandler(options, logfile):
 
     # Add the oops publisher that writes files in the configured place
     # if the command line option was set.
+
+    if options["oops-exchange"]:
+        oops_exchange = options["oops-exchange"]
+        oops_key = options["oops-routingkey"] or ""
+        host = options["brokerhost"]
+        if options["brokerport"]:
+            host = "%s:%s" % (host, options["brokerport"])
+        rabbit_connect = partial(amqp.Connection,
+            host=host, userid=options["brokeruser"],
+            password=options["brokerpassword",
+            virtual_host=options["brokervhost"])
+        amqp_publisher = Publisher(
+                rabbit_connect, oops_exchange, oops_key)
+        config.publishers.append(defer_publisher(amqp_publisher))
+
     if options["oops-dir"]:
-        repo = DateDirRepo(options["oops-dir"], options["oops-prefix"])
-        config.publishers.append(defer_publisher(repo.publish))
+        repo = DateDirRepo(options["oops-dir"])
+        config.publishers.append(
+            defer_publisher(oops.publish_new_only(repo.publish)))
+
+    if options["oops-reporter"]:
+        config.template['reporter'] = options["oops-reporter"]
 
     observer = OOPSObserver(config, logfile.emit)
     addObserver(observer.emit)
@@ -82,7 +105,9 @@ class Options(usage.Options):
         ["frontendport", "f", None, "Frontend port"],
         ["prefix", "x", None, "Queue prefix"],
         ["oops-dir", "r", None, "Where to write OOPS reports"],
-        ["oops-prefix", "o", "LONGPOLL", "String prefix for OOPS IDs"],
+        ["oops-reporter", "o", "LONGPOLL", "String identifying this service."],
+        ["oops-exchange", None, None, "AMQP Exchange to send OOPS reports to."],
+        ["oops-routingkey", None, None, "Routing key for AMQP OOPSes."],
         ]
 
     def postOptions(self):
@@ -94,6 +119,10 @@ class Options(usage.Options):
                 self[int_arg] = int(self[int_arg])
             except (TypeError, ValueError):
                 raise usage.UsageError("--%s must be an integer." % int_arg)
+        if not self["oops-reporter"] and
+            (self["oops-exchange"] or self["oops-dir"]):
+            raise usage.UsageError("A reporter must be supplied to identify "
+                "reports from this service from other OOPS reports.")
 
 
 class AMQServiceMaker(object):
