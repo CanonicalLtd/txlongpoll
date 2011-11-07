@@ -8,8 +8,13 @@ By default txlongpoll attempts to build without going to the network;
 instead it tries to find all dependencies from download-cache/dist,
 and you must download all the dependencies yourself.
 
-If you prefer for buildout to find dependencies from PyPI then comment
-out the ``install-from-cache = true`` line in buildout.cfg.
+If you prefer to use resources from the 'net, PyPI for example, then:
+
+- Remove the --setup-source and --download-base options in Makefile to
+  allow bootstrap.py to download setuptools.
+
+- Comment out the ``install-from-cache = true`` line in buildout.cfg
+  to allow bin/buildout to download dependencies.
 
 To run the tests you may also need lp:rabbitfixture (bzr branch
 lp:rabbitfixture). Build an sdist tarball and drop it into
