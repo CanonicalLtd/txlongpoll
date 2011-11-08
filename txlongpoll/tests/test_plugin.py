@@ -60,25 +60,35 @@ class TestOptions(TestCase):
             }
         self.assertEqual(expected, options.defaults)
 
-    def test_parse_minimal_options(self):
-        # Some options are mandatory.
+    def check_exception(self, options, message, *arguments):
+        # Check that a UsageError is raised when parsing options.
+        self.assertThat(
+            partial(options.parseOptions, arguments),
+            Raises(MatchesException(UsageError, message)))
+
+    def test_option_frontendport_required(self):
         options = Options()
-
-        def check_exception(message, *arguments):
-            self.assertThat(
-                partial(options.parseOptions, arguments),
-                Raises(MatchesException(UsageError, message)))
-
-        check_exception(
+        self.check_exception(
+            options,
             "--frontendport must be specified")
-        check_exception(
+
+    def test_option_brokeruser_required(self):
+       options = Options()
+       self.check_exception(
+            options,
             "--brokeruser must be specified",
             "--frontendport", "1234")
-        check_exception(
+
+    def test_option_brokerpassword_required(self):
+        options = Options()
+        self.check_exception(
+            options,
             "--brokerpassword must be specified",
             "--brokeruser", "Bob",
             "--frontendport", "1234")
 
+    def test_parse_minimal_options(self):
+        options = Options()
         # The minimal set of options that must be provided.
         arguments = [
             "--brokerpassword", "Hoskins",
