@@ -46,6 +46,14 @@ test run, but
 
 will just do the first part.
 
+There is testrepository <https://launchpad.net/testrepository>
+support, so you can also do the following:
+
+ $ testr init
+ $ testr run
+
+This is probably the best way to develop txlongpoll.
+
 
 Running
 -------

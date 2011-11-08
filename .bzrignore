@@ -11,3 +11,4 @@
 ./parts
 ./tags
 dropin.cache
+./.testrepository
