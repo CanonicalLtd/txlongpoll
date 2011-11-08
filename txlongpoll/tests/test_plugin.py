@@ -30,15 +30,6 @@ from txlongpoll.plugin import (
     )
 
 
-def options_diff(a, b):
-    diff = []
-    for name in sorted(set().union(a, b)):
-        val_a, val_b = a.get(name), b.get(name)
-        if val_a != val_b:
-            diff.append((name, val_a, val_b))
-    return diff
-
-
 class TestOptions(TestCase):
     """Tests for `txlongpoll.plugin.Options`."""
 
@@ -107,14 +98,8 @@ class TestOptions(TestCase):
             "--frontendport", "1234",
             ]
         options.parseOptions(arguments)
-        expected_diff = [
-            ("brokerpassword", None, "Hoskins"),
-            ("brokerport", 5672, 4321),
-            ("brokeruser", None, "Bob"),
-            ("frontendport", None, 1234),
-            ]
-        observed_diff = options_diff(options.defaults, options)
-        self.assertEqual(expected_diff, observed_diff)
+        self.assertEqual(4321, options["brokerport"])
+        self.assertEqual(1234, options["frontendport"])
 
     def test_parse_broken_int_options(self):
         # An error is raised if the integer options do not contain integers.
