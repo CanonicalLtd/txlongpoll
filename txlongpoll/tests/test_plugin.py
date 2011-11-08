@@ -176,7 +176,7 @@ class TestSetUpOOPSHandler(TestCase):
             {"reporter": options.defaults["oops-reporter"]},
             observer.config.template)
 
-    def test_with_all_the_things(self):
+    def test_with_all_params(self):
         settings = {
             "oops-exchange": "Frank",
             "oops-reporter": "Sidebottom",
@@ -189,7 +189,7 @@ class TestSetUpOOPSHandler(TestCase):
             {"reporter": "Sidebottom"},
             observer.config.template)
 
-    def test_with_some_of_the_things(self):
+    def test_with_some_params(self):
         settings = {
             "oops-exchange": "Frank",
             "oops-reporter": "Sidebottom",
