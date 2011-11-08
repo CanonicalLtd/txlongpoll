@@ -18,6 +18,7 @@ setup(
     zip_safe=False,
     description='Long polling HTTP frontend for AMQP',
     install_requires=[
+        'oops_amqp',
         'oops_datedir_repo',
         'oops_twisted >= 0.0.3',
         'setproctitle',
@@ -30,5 +31,6 @@ setup(
             'rabbitfixture',
             'testresources >= 0.2.4_r58',
             'testtools',
+            # 'subunit',  # Not easy-installable.
             ],
         ))
