@@ -3,6 +3,7 @@
 
 from cStringIO import StringIO
 from functools import partial
+import os
 from unittest import defaultTestLoader
 
 from fixtures import TempDir
@@ -219,7 +220,9 @@ class TestAMQServiceMaker(IsolatedTestCase, TestCase):
         return options
 
     def test_makeService(self):
-        options = self.makeOptions({})
+        logfile = os.path.join(
+            self.useFixture(TempDir()).path, "txlongpoll.log")
+        options = self.makeOptions({"logfile": logfile})
         service_maker = AMQServiceMaker("Harry", "Hill")
         service = service_maker.makeService(options)
         self.assertIsInstance(service, MultiService)
