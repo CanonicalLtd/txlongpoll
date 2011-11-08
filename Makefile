@@ -2,54 +2,71 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 PYTHON = python
-PY = $(PWD)/bin/py
 
-BUILDOUT_CFG = buildout.cfg
+BOOTSTRAP_BIN := bootstrap.py
+BOOTSTRAP = PYTHONPATH= $(PYTHON) $(BOOTSTRAP_BIN)
 
-# Do not add bin/buildout to this list. It is impossible to get
-# buildout to tell us all the files it would build, since each egg's
-# setup.py doesn't tell us that information.
-#
-# NB: It's important BUILDOUT_BIN only mentions things genuinely
-# produced by buildout.
-BUILDOUT_BIN = $(PY) bin/tags bin/test bin/txlongpoll
+BUILDOUT_BIN := bin/buildout
+BUILDOUT_CFG := buildout.cfg
+BUILDOUT = PYTHONPATH= $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
 
 
 default: check
 
 
-download-cache:
-	mkdir download-cache
+build: bin/twistd
 
 
-bin/buildout: download-cache
-	$(PYTHON) bootstrap.py
-	touch --no-create $@
-
-
-$(PY): bin/buildout $(BUILDOUT_CFG) setup.py
-	PYTHONPATH=. ./bin/buildout -c $(BUILDOUT_CFG)
-
-
-$(subst $(PY),,$(BUILDOUT_BIN)): $(PY)
-
-
-build: $(BUILDOUT_BIN)
-
-
-update-paths: bin/buildout
-	bin/buildout -oN
-
-
-dist: $(PY)
-	$(PY) setup.py egg_info -r sdist
+# When a built tree is moved this updates absolute paths.
+build-update-paths:
+	$(BUILDOUT)
 
 
 check: bin/test
-	./bin/test -vv
+	bin/test -vv
 
 
-clean_buildout: 
+dist: $(BUILDOUT_BIN)
+	$(BUILDOUT) setup setup.py egg_info -r sdist
+
+
+TAGS: bin/tags
+	bin/tags --ctags-emacs
+
+
+tags: bin/tags
+	bin/tags --ctags-vi
+
+
+download-cache:
+	mkdir -p download-cache
+
+
+eggs:
+	mkdir -p eggs
+
+
+$(BUILDOUT_BIN): download-cache eggs
+	$(BOOTSTRAP) \
+	    --setup-source=download-cache/dist/ez_setup.py \
+	    --download-base=download-cache/dist \
+	    --eggs=eggs --version=1.5.2
+	touch --no-create $@
+
+
+bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
+	$(BUILDOUT) install runtime
+
+
+bin/test: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
+	$(BUILDOUT) install test
+
+
+bin/tags: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
+	$(BUILDOUT) install tags
+
+
+clean_buildout:
 	$(RM) -r bin
 	$(RM) -r parts
 	$(RM) -r develop-eggs
@@ -65,10 +82,11 @@ clean_eggs:
 
 
 clean: clean_buildout
+	find txlongpoll twisted -name '*.py[co]' -print0 | xargs -r0 $(RM)
 
 clean_all: clean_buildout clean_eggs
 
 
 .PHONY: \
-  build check clean clean_all clean_buildout \
-  clean_eggs default dist update-paths
+    build build-update-paths check clean clean_all clean_buildout \
+    clean_eggs default dist
