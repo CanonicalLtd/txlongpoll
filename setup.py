@@ -19,7 +19,7 @@ setup(
     description='Long polling HTTP frontend for AMQP',
     install_requires=[
         'oops_amqp',
-        'oops_datedir_repo',
+        'oops_datedir_repo >= 0.0.13',
         'oops_twisted >= 0.0.3',
         'setproctitle',
         'Twisted',
