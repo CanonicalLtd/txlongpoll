@@ -18,10 +18,11 @@ setup(
     zip_safe=False,
     description='Long polling HTTP frontend for AMQP',
     install_requires=[
+        'formencode',
         'oops_amqp',
         'oops_datedir_repo >= 0.0.13',
         'oops_twisted >= 0.0.3',
-        'setproctitle',
+        'pyyaml',
         'Twisted',
         'txAMQP >= 0.5',
         'zope.interface',

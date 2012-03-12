@@ -1,34 +1,88 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from cStringIO import StringIO
 from functools import partial
+from getpass import getuser
 import os
 from unittest import defaultTestLoader
 
 from fixtures import TempDir
-from oops_twisted import OOPSObserver
+from formencode import Invalid
 from subunit import IsolatedTestCase
 from testtools import TestCase
-from testtools.content import (
-    Content,
-    UTF8_TEXT,
-    )
 from testtools.matchers import (
     MatchesException,
     Raises,
     )
 from twisted.application.service import MultiService
-from twisted.python.log import (
-    FileLogObserver,
-    theLogPublisher,
-    )
-from twisted.python.usage import UsageError
 from txlongpoll.plugin import (
     AMQServiceMaker,
+    Config,
     Options,
-    setUpOOPSHandler,
     )
+
+
+class TestConfig(TestCase):
+    """Tests for `txlongpoll.plugin.Options`."""
+
+    def test_defaults(self):
+        expected = {
+            'broker': {
+                'host': 'localhost',
+                'password': 'test',
+                'port': 5672,
+                'username': getuser(),
+                'vhost': u'/',
+                },
+            'frontend': {
+                'port': 8001,
+                'prefix': None,
+                },
+            'logfile': 'txlongpoll.log',
+            'oops': {
+                'directory': '',
+                'reporter': 'LONGPOLL',
+                },
+            }
+        observed = Config.to_python({})
+        self.assertEqual(expected, observed)
+
+    def test_parse(self):
+        # Configuration can be parsed from a snippet of YAML.
+        observed = Config.parse(b'logfile: "/some/where.log"')
+        self.assertEqual("/some/where.log", observed["logfile"])
+
+    def test_load(self):
+        # Configuration can be loaded and parsed from a file.
+        filename = os.path.join(
+            self.useFixture(TempDir()).path, "config.yaml")
+        with open(filename, "wb") as stream:
+            stream.write(b'logfile: "/some/where.log"')
+        observed = Config.load(filename)
+        self.assertEqual("/some/where.log", observed["logfile"])
+
+    def test_load_example(self):
+        # The example configuration can be loaded and validated.
+        filename = os.path.join(
+            os.path.dirname(__file__), os.pardir,
+            os.pardir, "etc", "txlongpoll.yaml")
+        Config.load(filename)
+
+    def check_exception(self, config, message):
+        # Check that a UsageError is raised when parsing options.
+        self.assertThat(
+            partial(Config.to_python, config),
+            Raises(MatchesException(Invalid, message)))
+
+    def test_option_broker_port_integer(self):
+        self.check_exception(
+            {"broker": {"port": "bob"}},
+            "broker: port: Please enter an integer value")
+
+    def test_option_frontend_port_integer(self):
+        self.check_exception(
+            {"frontend": {"port": "bob"}},
+            "frontend: port: Please enter an integer value")
 
 
 class TestOptions(TestCase):
@@ -36,171 +90,14 @@ class TestOptions(TestCase):
 
     def test_defaults(self):
         options = Options()
-        expected = {
-            "brokerhost": "127.0.0.1",
-            "brokerpassword": None,
-            "brokerport": 5672,
-            "brokeruser": None,
-            "brokervhost": "/",
-            "frontendport": None,
-            "logfile": "txlongpoll.log",
-            "oops-dir": None,
-            "oops-exchange": None,
-            "oops-reporter": "LONGPOLL",
-            "oops-routingkey": None,
-            "prefix": None,
-            }
+        expected = {"config-file": "etc/txlongpoll.yaml"}
         self.assertEqual(expected, options.defaults)
-
-    def check_exception(self, options, message, *arguments):
-        # Check that a UsageError is raised when parsing options.
-        self.assertThat(
-            partial(options.parseOptions, arguments),
-            Raises(MatchesException(UsageError, message)))
-
-    def test_option_frontendport_required(self):
-        options = Options()
-        self.check_exception(
-            options,
-            "--frontendport must be specified")
-
-    def test_option_brokeruser_required(self):
-       options = Options()
-       self.check_exception(
-            options,
-            "--brokeruser must be specified",
-            "--frontendport", "1234")
-
-    def test_option_brokerpassword_required(self):
-        options = Options()
-        self.check_exception(
-            options,
-            "--brokerpassword must be specified",
-            "--brokeruser", "Bob",
-            "--frontendport", "1234")
 
     def test_parse_minimal_options(self):
         options = Options()
         # The minimal set of options that must be provided.
-        arguments = [
-            "--brokerpassword", "Hoskins",
-            "--brokeruser", "Bob",
-            "--frontendport", "1234",
-            ]
+        arguments = []
         options.parseOptions(arguments)  # No error.
-
-    def test_parse_int_options(self):
-        # Some options are converted to ints.
-        options = Options()
-        arguments = [
-            "--brokerpassword", "Hoskins",
-            "--brokerport", "4321",
-            "--brokeruser", "Bob",
-            "--frontendport", "1234",
-            ]
-        options.parseOptions(arguments)
-        self.assertEqual(4321, options["brokerport"])
-        self.assertEqual(1234, options["frontendport"])
-
-    def test_parse_broken_int_options(self):
-        # An error is raised if the integer options do not contain integers.
-        options = Options()
-        arguments = [
-            "--brokerpassword", "Hoskins",
-            "--brokerport", "Jr.",
-            "--brokeruser", "Bob",
-            ]
-        self.assertRaises(
-            UsageError, options.parseOptions, arguments)
-
-    def test_oops_exchange_without_reporter(self):
-        # It is an error to omit the OOPS reporter if exchange is specified.
-        options = Options()
-        arguments = [
-            "--brokerpassword", "Hoskins",
-            "--brokeruser", "Bob",
-            "--frontendport", "1234",
-            "--oops-exchange", "something",
-            "--oops-reporter", "",
-            ]
-        expected = MatchesException(
-            UsageError, "A reporter must be supplied")
-        self.assertThat(
-            partial(options.parseOptions, arguments),
-            Raises(expected))
-
-    def test_oops_dir_without_reporter(self):
-        # It is an error to omit the OOPS reporter if directory is specified.
-        options = Options()
-        arguments = [
-            "--brokerpassword", "Hoskins",
-            "--brokeruser", "Bob",
-            "--frontendport", "1234",
-            "--oops-dir", "/some/where",
-            "--oops-reporter", "",
-            ]
-        expected = MatchesException(
-            UsageError, "A reporter must be supplied")
-        self.assertThat(
-            partial(options.parseOptions, arguments),
-            Raises(expected))
-
-
-class TestSetUpOOPSHandler(TestCase):
-    """Tests for `txlongpoll.plugin.setUpOOPSHandler`."""
-
-    def setUp(self):
-        super(TestSetUpOOPSHandler, self).setUp()
-        self.observers = theLogPublisher.observers[:]
-        self.logfile = StringIO()
-        self.addDetail("log", Content(UTF8_TEXT, self.logfile.getvalue))
-        self.log = FileLogObserver(self.logfile)
-
-    def tearDown(self):
-        super(TestSetUpOOPSHandler, self).tearDown()
-        theLogPublisher.observers[:] = self.observers
-
-    def makeObserver(self, settings):
-        options = Options()
-        options["brokerpassword"] = "Hoskins"
-        options["brokeruser"] = "Bob"
-        options["frontendport"] = 1234
-        options.update(settings)
-        observer = setUpOOPSHandler(options, self.log)
-        return options, observer
-
-    def test_minimal(self):
-        options, observer = self.makeObserver({})
-        self.assertIsInstance(observer, OOPSObserver)
-        self.assertEqual([], observer.config.publishers)
-        self.assertEqual(
-            {"reporter": options.defaults["oops-reporter"]},
-            observer.config.template)
-
-    def test_with_all_params(self):
-        settings = {
-            "oops-exchange": "Frank",
-            "oops-reporter": "Sidebottom",
-            "oops-dir": self.useFixture(TempDir()).path,
-            }
-        options, observer = self.makeObserver(settings)
-        self.assertIsInstance(observer, OOPSObserver)
-        self.assertEqual(2, len(observer.config.publishers))
-        self.assertEqual(
-            {"reporter": "Sidebottom"},
-            observer.config.template)
-
-    def test_with_some_params(self):
-        settings = {
-            "oops-exchange": "Frank",
-            "oops-reporter": "Sidebottom",
-            }
-        options, observer = self.makeObserver(settings)
-        self.assertIsInstance(observer, OOPSObserver)
-        self.assertEqual(1, len(observer.config.publishers))
-        self.assertEqual(
-            {"reporter": "Sidebottom"},
-            observer.config.template)
 
 
 class TestAMQServiceMaker(IsolatedTestCase, TestCase):
@@ -211,26 +108,18 @@ class TestAMQServiceMaker(IsolatedTestCase, TestCase):
         self.assertEqual("Harry", service_maker.tapname)
         self.assertEqual("Hill", service_maker.description)
 
-    def makeOptions(self, settings):
-        options = Options()
-        options["brokerpassword"] = "Hoskins"
-        options["brokeruser"] = "Bob"
-        options["frontendport"] = 1234
-        options.update(settings)
-        return options
-
     def test_makeService(self):
-        logfile = os.path.join(
-            self.useFixture(TempDir()).path, "txlongpoll.log")
-        options = self.makeOptions({"logfile": logfile})
+        options = Options()
         service_maker = AMQServiceMaker("Harry", "Hill")
         service = service_maker.makeService(options)
         self.assertIsInstance(service, MultiService)
-        self.assertEqual(2, len(service.services))
-        client_service, server_service = service.services
-        self.assertEqual(options["brokerhost"], client_service.args[0])
-        self.assertEqual(options["brokerport"], client_service.args[1])
-        self.assertEqual(options["frontendport"], server_service.args[0])
+        self.assertEqual(4, len(service.services))
+        self.assertSequenceEqual(
+            ["amqp", "frontend", "log", "oops"],
+            sorted(service.namedServices))
+        self.assertEqual(
+            len(service.namedServices), len(service.services),
+            "Not all services are named.")
 
 
 def test_suite():
