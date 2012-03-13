@@ -5,17 +5,17 @@
 ## The front-end service.
 #
 frontend:
-  # The port on which to serve.
+  ## The port on which to serve.
   port: 56100
-  # If specified, the queue name requested must have the given prefix.
+  ## If specified, queue names requested must have the given prefix.
   # prefix:
 
 ## OOPS configuration.
 #
 oops:
-  # Directory in which to place OOPS reports.
+  ## Directory in which to place OOPS reports.
   # directory: ""
-  # The reporter used when generating OOPS reports.
+  ## The reporter used when generating OOPS reports.
   # reporter: "LONGPOLL"
 
 ## Message broker configuration.
