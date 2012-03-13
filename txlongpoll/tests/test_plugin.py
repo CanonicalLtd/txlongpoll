@@ -5,11 +5,9 @@ from functools import partial
 import os
 from unittest import defaultTestLoader
 
-from fixtures import (
-    EnvironmentVariableFixture,
-    TempDir,
-    )
+from fixtures import TempDir
 from formencode import Invalid
+from formencode.api import set_stdtranslation
 from subunit import IsolatedTestCase
 from testtools import TestCase
 from testtools.matchers import (
@@ -24,14 +22,12 @@ from txlongpoll.plugin import (
     )
 
 
+# Ensure that formencode does not translate strings during testing.
+set_stdtranslation(languages=[])
+
+
 class TestConfig(TestCase):
     """Tests for `txlongpoll.plugin.Options`."""
-
-    def setUp(self):
-        super(TestConfig, self).setUp()
-        # Ensure that formencode does not translate strings.
-        env = EnvironmentVariableFixture("LANG", "C")
-        self.useFixture(env)
 
     def test_defaults(self):
         expected = {
