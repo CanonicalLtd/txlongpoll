@@ -76,12 +76,12 @@ class TestConfig(TestCase):
     def test_option_broker_port_integer(self):
         self.check_exception(
             {"broker": {"port": "bob"}},
-            "broker: port: Please enter an integer value")
+            u"broker: port: Please enter an integer value")
 
     def test_option_frontend_port_integer(self):
         self.check_exception(
             {"frontend": {"port": "bob"}},
-            "frontend: port: Please enter an integer value")
+            u"frontend: port: Please enter an integer value")
 
 
 class TestOptions(TestCase):
