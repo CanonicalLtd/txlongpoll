@@ -5,7 +5,10 @@ from functools import partial
 import os
 from unittest import defaultTestLoader
 
-from fixtures import TempDir
+from fixtures import (
+    EnvironmentVariableFixture,
+    TempDir,
+    )
 from formencode import Invalid
 from subunit import IsolatedTestCase
 from testtools import TestCase
@@ -23,6 +26,12 @@ from txlongpoll.plugin import (
 
 class TestConfig(TestCase):
     """Tests for `txlongpoll.plugin.Options`."""
+
+    def setUp(self):
+        super(TestConfig, self).setUp()
+        # Ensure that formencode does not translate strings.
+        env = EnvironmentVariableFixture("LANG", "C")
+        self.useFixture(env)
 
     def test_defaults(self):
         expected = {
@@ -76,12 +85,12 @@ class TestConfig(TestCase):
     def test_option_broker_port_integer(self):
         self.check_exception(
             {"broker": {"port": "bob"}},
-            u"broker: port: Please enter an integer value")
+            "broker: port: Please enter an integer value")
 
     def test_option_frontend_port_integer(self):
         self.check_exception(
             {"frontend": {"port": "bob"}},
-            u"frontend: port: Please enter an integer value")
+            "frontend: port: Please enter an integer value")
 
 
 class TestOptions(TestCase):
