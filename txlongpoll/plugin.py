@@ -11,6 +11,7 @@ __all__ = [
     ]
 
 from formencode import Schema
+from formencode.api import set_stdtranslation
 from formencode.validators import (
     Int,
     RequireIfPresent,
@@ -41,6 +42,11 @@ from txlongpoll.services import (
     )
 import yaml
 from zope.interface import implements
+
+
+# Ensure that formencode does not translate strings; there are encoding issues
+# that are easier to side-step for now.
+set_stdtranslation(languages=[])
 
 
 class ConfigOops(Schema):

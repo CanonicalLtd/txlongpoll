@@ -7,7 +7,6 @@ from unittest import defaultTestLoader
 
 from fixtures import TempDir
 from formencode import Invalid
-from formencode.api import set_stdtranslation
 from subunit import IsolatedTestCase
 from testtools import TestCase
 from testtools.matchers import (
@@ -20,10 +19,6 @@ from txlongpoll.plugin import (
     Config,
     Options,
     )
-
-
-# Ensure that formencode does not translate strings during testing.
-set_stdtranslation(languages=[])
 
 
 class TestConfig(TestCase):
