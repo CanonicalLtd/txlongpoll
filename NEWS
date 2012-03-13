@@ -14,3 +14,9 @@ NEXT
 * Tests are run with subunit by default, removing the dependency on
   Zope's test runner. Support for testrepository has also been
   added. (Gavin Panella)
+
+0.3
+---
+
+* Allow txlongpoll to take a config file in addition to specifying command
+  line options.
