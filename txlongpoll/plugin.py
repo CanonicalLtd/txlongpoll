@@ -10,8 +10,6 @@ __all__ = [
     "AMQServiceMaker",
     ]
 
-from getpass import getuser
-
 from formencode import Schema
 from formencode.validators import (
     Int,
@@ -65,8 +63,8 @@ class ConfigBroker(Schema):
 
     host = String(if_missing=b"localhost")
     port = Int(min=1, max=65535, if_missing=5672)
-    username = String(if_missing=getuser())
-    password = String(if_missing=b"test")
+    username = String(if_missing=b"guest")
+    password = String(if_missing=b"guest")
     vhost = String(if_missing="/")
 
 

@@ -23,8 +23,8 @@ oops:
 broker:
   # host: "localhost"
   # port: 5672
-  # username: <current user>
-  # password: "test"
+  # username: "guest"
+  # password: "guest"
   # vhost: "/"
 
 ## Where to log. This log can be rotated by sending SIGUSR1 to the

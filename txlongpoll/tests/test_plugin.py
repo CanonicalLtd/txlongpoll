@@ -2,7 +2,6 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from functools import partial
-from getpass import getuser
 import os
 from unittest import defaultTestLoader
 
@@ -29,9 +28,9 @@ class TestConfig(TestCase):
         expected = {
             'broker': {
                 'host': 'localhost',
-                'password': 'test',
+                'password': 'guest',
                 'port': 5672,
-                'username': getuser(),
+                'username': "guest",
                 'vhost': u'/',
                 },
             'frontend': {
