@@ -1,2 +1,3 @@
+graft etc
 graft txlongpoll/specs
 exclude MANIFEST.in

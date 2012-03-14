@@ -12,7 +12,7 @@ from setuptools import (
 
 setup(
     name='txlongpoll',
-    version="0.3",
+    version="0.3.1",
     packages=find_packages('.') + ['twisted.plugins'],
     include_package_data=True,
     zip_safe=False,
