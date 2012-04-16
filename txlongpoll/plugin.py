@@ -81,6 +81,7 @@ class ConfigFrontend(Schema):
 
     port = Int(min=1, max=65535, if_missing=8001)
     prefix = String(if_missing=None)
+    interface = String(if_missing=None)
 
 
 class Config(Schema):
@@ -146,6 +147,7 @@ class AMQServiceMaker(object):
         frontend_config = config["frontend"]
         frontend_port = frontend_config["port"]
         frontend_prefix = frontend_config["prefix"]
+        frontend_interface = frontend_config["interface"]
         frontend_manager = QueueManager(frontend_prefix)
 
         broker_config = config["broker"]
@@ -169,7 +171,9 @@ class AMQServiceMaker(object):
         client_service.setServiceParent(services)
 
         frontend_resource = FrontEndAjax(frontend_manager)
-        frontend_service = TCPServer(frontend_port, Site(frontend_resource))
+        frontend_service = TCPServer(
+            frontend_port, Site(frontend_resource),
+            interface=frontend_interface)
         frontend_service.setName("frontend")
         frontend_service.setServiceParent(services)
 

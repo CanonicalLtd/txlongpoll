@@ -36,6 +36,7 @@ class TestConfig(TestCase):
             'frontend': {
                 'port': 8001,
                 'prefix': None,
+                'interface': None,
                 },
             'logfile': 'txlongpoll.log',
             'oops': {

@@ -9,6 +9,10 @@ frontend:
   port: 56100
   ## If specified, queue names requested must have the given prefix.
   # prefix:
+  ## If specified, bind the server to this interface.  e.g. specify
+  ## 127.0.0.1 to only allow clients on the same host to connect. Defaults
+  ## to allowing connections from all interfaces.
+  interface: 127.0.0.1
 
 ## OOPS configuration.
 #
