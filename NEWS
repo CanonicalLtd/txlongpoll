@@ -15,6 +15,15 @@ NEXT
   Zope's test runner. Support for testrepository has also been
   added. (Gavin Panella)
 
+0.3.2
+-----
+* Add new config option frontend/interface so the bind interface can be
+  changed.
+
+0.3.1
+-----
+* Include etc/ in sdist
+
 0.3
 ---
 
