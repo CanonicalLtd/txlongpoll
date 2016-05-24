@@ -23,7 +23,7 @@ build-update-paths:
 
 
 check: bin/testpy
-	bin/testpy -m txlongpoll/testing/runner -- discover
+	bin/testpy -m subunit/run -- discover
 
 
 dist: $(BUILDOUT_BIN)

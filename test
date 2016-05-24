@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec "$(dirname "$0")/bin/testpy" -m txlongpoll/testing/runner -- "$@"
+exec "$(dirname "$0")/bin/testpy" -m subunit/run -- "$@"
