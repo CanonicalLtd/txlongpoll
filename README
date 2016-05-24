@@ -42,7 +42,7 @@ Testing
 will build all the test-related parts of txlongpoll and then do a full
 test run, but
 
- $ make bin/test
+ $ make bin/testpy
 
 will just do the first part.
 

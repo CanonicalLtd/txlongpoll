@@ -23,7 +23,7 @@ build-update-paths:
 
 
 check: bin/testpy
-	bin/testpy -m subunit/run -- discover
+	bin/testpy -m txlongpoll/testing/runner -- discover
 
 
 dist: $(BUILDOUT_BIN)
@@ -48,8 +48,6 @@ eggs:
 
 $(BUILDOUT_BIN): download-cache eggs
 	$(BOOTSTRAP) \
-	    --setup-source=download-cache/dist/ez_setup.py \
-	    --download-base=download-cache/dist \
 	    --eggs=eggs --version=1.5.2
 	touch --no-create $@
 
