@@ -48,6 +48,8 @@ eggs:
 
 $(BUILDOUT_BIN): download-cache eggs
 	$(BOOTSTRAP) \
+	    --setup-source=download-cache/dist/ez_setup.py \
+	    --download-base=download-cache/dist \
 	    --eggs=eggs --version=1.5.2
 	touch --no-create $@
 
