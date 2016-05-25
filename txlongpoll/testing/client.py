@@ -36,12 +36,22 @@ class QueueWrapper(object):
         return self._real_queue_get(timeout)
 
 
+class RabbitServerWithoutReset(RabbitServer):
+
+    def reset(self):
+        """No-op reset.
+
+        Logic to cleanup relevant state is delegated to the test case, which is
+        in charge to delete the queues it created (see AMQTest.tearDown).
+        """
+
+
 class AMQTest(ResourcedTestCase, TestCase):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
         timeout=5)
 
-    resources = [('rabbit', FixtureResource(RabbitServer()))]
+    resources = [('rabbit', FixtureResource(RabbitServerWithoutReset()))]
 
     VHOST = "/"
     USER = "guest"
@@ -65,18 +75,23 @@ class AMQTest(ResourcedTestCase, TestCase):
             self.factory)
         return self.connected_deferred
 
-    @inlineCallbacks
     def tearDown(self):
-        # XXX: Moving this up here to silence a nigh-on inexplicable error
-        # that occurs when it's at the bottom of the function.
+        # The AsynchronousDeferredRunTest machinery from testools doesn't play
+        # well with an asynchronous tearDown decorated with inlineCallbacks,
+        # because testtools.TestCase._run_teardown attempts to ensure that the
+        # test class upcalls testtools.TestCase.tearDown and raises an error if
+        # it doesn't find it. To workaround that, we move the inlineCallbacks
+        # logic in a separate method, so we can run the superclass tearDown()
+        # before returning.
+        deferred = self._deleteQueuesAndExchanges()
+        super(AMQTest, self).tearDown()
+        return deferred
+
+    @inlineCallbacks
+    def _deleteQueuesAndExchanges(self):
+        """Delete any queue or exchange that the test might have created."""
         self.factory.stopTrying()
         self.connector.disconnect()
-        super(AMQTest, self).tearDown()
-
-        # XXX: This is only safe because we tear down the whole server.
-        #      We can't run this after the tearDown above, because the
-        #      fixture is gone.
-        return
 
         self.connected_deferred = Deferred()
         factory = AMQFactory(self.USER, self.PASSWORD, self.VHOST,

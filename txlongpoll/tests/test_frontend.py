@@ -6,7 +6,10 @@ import json
 from unittest import defaultTestLoader
 
 from testtools import TestCase
-from testtools.deferredruntest import assert_fails_with
+from testtools.deferredruntest import (
+    assert_fails_with,
+    run_with_log_observers,
+    )
 from twisted.internet import reactor
 from twisted.internet.defer import (
     Deferred,
@@ -374,7 +377,7 @@ class FrontEndAjaxTest(TestCase):
         """
         self.message_queue.messages["uuid1"] = ValueError("Not there")
         request = FakeRequest({"uuid": ["uuid1"], "sequence": ["0"]})
-        self.ajax.render(request)
+        run_with_log_observers([], self.ajax.render, request)
         self.assertEquals(request.written.getvalue(), "Not there")
         self.assertEquals(request.code, 500)
 
