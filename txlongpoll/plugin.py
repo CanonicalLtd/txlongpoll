@@ -34,7 +34,7 @@ from twisted.web.server import Site
 from txlongpoll.client import AMQFactory
 from txlongpoll.frontend import (
     FrontEndAjax,
-    QueueManager,
+    DeprecatedQueueManager,
     )
 from txlongpoll.services import (
     LogService,
@@ -148,7 +148,7 @@ class AMQServiceMaker(object):
         frontend_port = frontend_config["port"]
         frontend_prefix = frontend_config["prefix"]
         frontend_interface = frontend_config["interface"]
-        frontend_manager = QueueManager(frontend_prefix)
+        frontend_manager = DeprecatedQueueManager(frontend_prefix)
 
         broker_config = config["broker"]
         broker_port = broker_config["port"]

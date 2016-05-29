@@ -30,7 +30,7 @@ from txamqp.queue import Empty
 from txlongpoll.frontend import (
     FrontEndAjax,
     NotFound,
-    QueueManager,
+    DeprecatedQueueManager,
     )
 from txlongpoll.testing.client import (
     AMQTest,
@@ -38,7 +38,7 @@ from txlongpoll.testing.client import (
     )
 
 
-class QueueManagerTest(AMQTest):
+class DeprecatedQueueManagerTest(AMQTest):
 
     prefix = None
     tag_prefix = ""
@@ -46,12 +46,12 @@ class QueueManagerTest(AMQTest):
 
     def setUp(self):
         self.clock = Clock()
-        self.manager = QueueManager(self.prefix)
+        self.manager = DeprecatedQueueManager(self.prefix)
         return AMQTest.setUp(self)
 
     def test_wb_connected(self):
         """
-        The C{connected} callback of L{QueueManager} sets the C{_client} and
+        The C{connected} callback of L{DeprecatedQueueManager} sets the C{_client} and
         C{_channel} attributes.
         """
         d = self.manager.connected((self.client, self.channel))
@@ -263,7 +263,7 @@ class QueueManagerTest(AMQTest):
         yield assert_fails_with(d2, Empty)
 
 
-class QueueManagerTestWithPrefix(QueueManagerTest):
+class DeprecatedQueueManagerTestWithPrefix(DeprecatedQueueManagerTest):
 
     prefix = "test"
     tag_prefix = "test.notifications-tag."
