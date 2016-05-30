@@ -1,8 +1,14 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-"""
-Fetch notification messages from AMQP queues.
+"""Fire notifications from by consuming AMQP queues.
+
+This module provides a small abstraction around the AMQP protocol/transport,
+implementing an API that can be consumed by call sites wanting to receive
+notifications from specific streams identified by UUIDs, that map to AMQP
+queues.
+
+See also txlongpoll.frontend.FrontEndAjax.
 """
 
 from twisted.internet.defer import (
@@ -17,14 +23,18 @@ from txamqp.queue import (
     )
 
 
-__all__ = ["NotFound", "MessageSource"]
+__all__ = ["NotFound", "NotificationSource"]
 
 
 class NotFound(Exception):
-    """Exception raised when a queue is not found in the AMQP broker."""
+    """Raised the notifications stream for a given UUID is not available.
+
+    This typically happens when the associated AMQP queue doesn't exist
+    or was delelated from the broker.
+    """
 
 
-class MessageSource(object):
+class NotificationSource(object):
     """
     An AMQP consumer which handles messages sent over a "frontend" queue to
     set up temporary queues.  The L{get_message} method should be invoked to

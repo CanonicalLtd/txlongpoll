@@ -20,20 +20,20 @@ from twisted.web.http import (
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from txamqp.queue import Empty
-from txlongpoll.message import (
+from txlongpoll.notification import (
     NotFound,
-    MessageSource,
+    NotificationSource,
 )
 
 
 __all__ = ["DeprecatedQueueManager", "QueueManager", "FrontEndAjax"]
 
 
-class DeprecatedQueueManager(MessageSource):
+class DeprecatedQueueManager(NotificationSource):
     """
     Legacy queue manager implementing the connected/disconnected callbacks.
     This class is deprecated and will eventually be dropped in favour of
-    MessageSource, which is designed to leverage txamqp's AMQService.
+    NotificationSource, which is designed to leverage txamqp's AMQService.
     """
 
     def disconnected(self):
@@ -70,7 +70,7 @@ class DeprecatedQueueManager(MessageSource):
 QueueManager = DeprecatedQueueManager  # For backward compatibility
 deprecatedModuleAttribute(
         Version("txlongpoll", 4, 0, 0),
-        "Use txlongpoll.message.MessageSource instead.",
+        "Use txlongpoll.notification.NotificationSource instead.",
         __name__,
         "QueueManager")
 
