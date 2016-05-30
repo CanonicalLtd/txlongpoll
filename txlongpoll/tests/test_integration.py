@@ -22,7 +22,7 @@ from txamqp.queue import Empty
 
 from testtools.deferredruntest import assert_fails_with
 
-from txlongpoll.message import NotFound
+from txlongpoll.notification import NotFound
 from txlongpoll.frontend import DeprecatedQueueManager
 from txlongpoll.testing.client import (
     AMQTest,
