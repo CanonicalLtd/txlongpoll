@@ -118,26 +118,3 @@ class NotificationSource(object):
         self._client.queues.pop(tag, None)
 
         returnValue((msg.content.body, msg.delivery_tag))
-
-    def reject_message(self, tag):
-        """Put back a message."""
-        return self._channel.basic_reject(tag, requeue=True)
-
-    def ack_message(self, tag):
-        """Confirm the reading of a message)."""
-        return self._channel.basic_ack(tag)
-
-    @inlineCallbacks
-    def cancel_get_message(self, uuid, sequence):
-        """
-        Cancel a previous C{get_message} when a request is done, to be able to
-        reuse the tag properly.
-
-        @param uuid: The identifier of the queue.
-        @param sequence: The sequential number for identifying the subscriber
-            in the queue.
-        """
-        if self._client is not None:
-            tag = self._tag_form % (uuid, sequence)
-            queue = yield self._client.queue(tag)
-            queue.put(Empty)

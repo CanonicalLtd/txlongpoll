@@ -7,7 +7,10 @@ Async frontend server for serving answers from background processor.
 
 import json
 
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import (
+    inlineCallbacks,
+    Deferred,
+)
 from twisted.python import log
 from twisted.python.deprecate import deprecatedModuleAttribute
 from twisted.python.versions import Version
@@ -58,6 +61,29 @@ class DeprecatedQueueManager(NotificationSource):
         while self._pending_requests:
             self._pending_requests.pop(0).callback(None)
         return d
+
+    def reject_message(self, tag):
+        """Put back a message."""
+        return self._channel.basic_reject(tag, requeue=True)
+
+    def ack_message(self, tag):
+        """Confirm the reading of a message)."""
+        return self._channel.basic_ack(tag)
+
+    @inlineCallbacks
+    def cancel_get_message(self, uuid, sequence):
+        """
+        Cancel a previous C{get_message} when a request is done, to be able to
+        reuse the tag properly.
+
+        @param uuid: The identifier of the queue.
+        @param sequence: The sequential number for identifying the subscriber
+            in the queue.
+        """
+        if self._client is not None:
+            tag = self._tag_form % (uuid, sequence)
+            queue = yield self._client.queue(tag)
+            queue.put(Empty)
 
     def _wait_for_connection(self):
         """
