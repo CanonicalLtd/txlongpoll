@@ -15,6 +15,8 @@ from twisted.internet.defer import (
     inlineCallbacks,
     returnValue,
 )
+from twisted.internet.task import deferLater
+from twisted.internet.error import ConnectionDone
 from twisted.python import log
 from txamqp.client import Closed
 from txamqp.queue import (
@@ -23,7 +25,7 @@ from txamqp.queue import (
     )
 
 
-__all__ = ["NotFound", "NotificationSource"]
+__all__ = ["NotFound", "Timeout", "NotificationSource"]
 
 
 class NotFound(Exception):
@@ -34,26 +36,56 @@ class NotFound(Exception):
     """
 
 
+class Timeout(Exception):
+    """Raised after a certain time as elapsed and no notification was received.
+
+    The value of the timeout is defined by NotificationSource.timeout.
+    """
+
+
+class Notification(object):
+    """A single notification from a stream."""
+
+    def __init__(self, message, channel):
+        """
+        @param message: The raw txamqp.message.Message received from the
+            underlying AMQP queue.
+        @param channel: The txamqp.protocol.Channel the message was received
+            through.
+        """
+        self._message = message
+        self._channel = channel
+
+    @property
+    def payload(self):
+        return self._message.content.body
+
+
 class NotificationSource(object):
     """
     An AMQP consumer which handles messages sent over a "frontend" queue to
     set up temporary queues.  The L{get_message} method should be invoked to
     retrieve one single message from those temporary queues.
 
-    @ivar message_timeout: time to wait for a message before giving up in
-        C{get_message}.
-    @ivar _channel: reference to the current C{AMQChannel}.
-    @ivar _client: reference to the current C{AMQClient}.
+    @ivar timeout: time to wait for a message before giving up in C{get}.
     """
 
     # The timeout must be lower than the Apache one in front, which by default
     # is 5 minutes.
-    message_timeout = 270
+    timeout = 270
 
-    def __init__(self, prefix=None):
+    def __init__(self, connector, prefix=None):
+        """
+        @param connector: A callable returning a deferred which should fire
+            with a connected AMQClient and an opened AMQChannel. The deferred
+            is expected to never errback (typically it will be fired by some
+            code which in case of failure keeps retrying to connect to a broker
+            or a cluster of brokers).
+        @param prefix: Optional prefix for identifying the AMQP queues we
+            should consume messages from.
+        """
+        self._connector = connector
         self._prefix = prefix
-        self._channel = None
-        self._client = None
         self._pending_requests = []
         # Preserve compatibility by using special forms for naming when a
         # prefix is specified.
@@ -65,56 +97,57 @@ class NotificationSource(object):
             self._queue_form = "%s"
 
     @inlineCallbacks
-    def get_message(self, uuid, sequence):
-        """Consume and return one message for C{uuid}.
+    def get(self, uuid, sequence):
+        """Request the next L{Notification} for C{uuid}.
 
-        @param uuid: The identifier of the queue.
-        @param sequence: The sequential number for identifying the subscriber
-            in the queue.
+        @param uuid: The identifier of the notifications stream.
+        @param sequence: Sequential number for identifying this particular
+            request. This makes it possible to invoke this API more than once
+            concurrently to handle the same notification. Typically only
+            one notification will be actually processed and the other discarded
+            as duplicates. The FrontEndAjax code makes use of this feature
+            in order to get rid of dead requests. See #745708.
 
-        If no message is received within the number of seconds in
-        L{message_timeout}, then the returned Deferred will errback with
-        L{Empty}.
+        If no notification is received within the number of seconds in
+        L{timeout}, then the returned Deferred will errback with L{Timeout}.
         """
-        if self._channel is None:
-            yield self._wait_for_connection()
+        client, channel = yield self._connector()
         tag = self._tag_form % (uuid, sequence)
         try:
-            yield self._channel.basic_consume(
+            yield channel.basic_consume(
                 consumer_tag=tag, queue=(self._queue_form % uuid))
 
             log.msg("Consuming from queue '%s'" % uuid)
 
-            queue = yield self._client.queue(tag)
-            msg = yield queue.get(self.message_timeout)
+            queue = yield client.queue(tag)
+            msg = yield queue.get(self.timeout)
         except Empty:
             # Let's wait for the cancel here
-            yield self._channel.basic_cancel(consumer_tag=tag)
-            self._client.queues.pop(tag, None)
+            yield channel.basic_cancel(consumer_tag=tag)
+            client.queues.pop(tag, None)
             # Check for the messages arrived in the mean time
             if queue.pending:
                 msg = queue.pending.pop()
-                returnValue((msg.content.body, msg.delivery_tag))
-            raise Empty()
+                returnValue(Notification(msg, channel))
+            raise Timeout()
         except QueueClosed:
             # The queue has been closed, presumably because of a side effect.
             # Let's retry after reconnection.
-            yield self._wait_for_connection()
-            data = yield self.get_message(uuid, sequence)
-            returnValue(data)
+            notification = yield deferLater(
+                client.clock, 0, self.get, uuid, sequence)
+            returnValue(notification)
         except Closed, e:
-            if self._client and self._client.transport:
-                self._client.transport.loseConnection()
+            client.close(ConnectionDone())
             if e.args and e.args[0].reply_code == 404:
                 raise NotFound()
             else:
                 raise
         except:
-            if self._client and self._client.transport:
-                self._client.transport.loseConnection()
+            if client and client.transport:
+                client.transport.loseConnection()
             raise
 
-        yield self._channel.basic_cancel(consumer_tag=tag, nowait=True)
-        self._client.queues.pop(tag, None)
+        yield channel.basic_cancel(consumer_tag=tag, nowait=True)
+        client.queues.pop(tag, None)
 
-        returnValue((msg.content.body, msg.delivery_tag))
+        returnValue(Notification(msg, channel))

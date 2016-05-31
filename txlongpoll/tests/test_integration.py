@@ -18,11 +18,13 @@ from txamqp.protocol import (
     AMQChannel,
     AMQClient,
 )
-from txamqp.queue import Empty
 
 from testtools.deferredruntest import assert_fails_with
 
-from txlongpoll.notification import NotFound
+from txlongpoll.notification import (
+    NotFound,
+    Timeout,
+)
 from txlongpoll.frontend import DeprecatedQueueManager
 from txlongpoll.testing.client import (
     AMQTest,
@@ -116,7 +118,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield assert_fails_with(d, Empty)
+        yield assert_fails_with(d, Timeout)
 
     @inlineCallbacks
     def test_get_message_after_error(self):
@@ -186,7 +188,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield assert_fails_with(d, Empty)
+        yield assert_fails_with(d, Timeout)
 
         self.assertNotIn(self.tag_prefix + "uuid1.0", self.client.queues)
 
@@ -241,7 +243,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield assert_fails_with(d1, Empty)
+        yield assert_fails_with(d1, Timeout)
 
         # Let's wrap the queue again
         reply = yield self.client.queue(self.tag_prefix + "uuid1.1")
@@ -252,7 +254,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         yield event_queue.get()
         yield deferLater(reactor, 0, lambda: None)
         self.clock.advance(self.manager.message_timeout + 1)
-        yield assert_fails_with(d2, Empty)
+        yield assert_fails_with(d2, Timeout)
 
 
 class DeprecatedQueueManagerTestWithPrefix(DeprecatedQueueManagerTest):
