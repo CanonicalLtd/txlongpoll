@@ -16,7 +16,6 @@ from twisted.internet.defer import (
     returnValue,
 )
 from twisted.internet.task import deferLater
-from twisted.internet.error import ConnectionDone
 from twisted.python import log
 from txamqp.client import Closed
 from txamqp.queue import (
@@ -137,7 +136,8 @@ class NotificationSource(object):
                 client.clock, 0, self.get, uuid, sequence)
             returnValue(notification)
         except Closed, e:
-            client.close(ConnectionDone())
+            if client.transport:
+                client.transport.loseConnection()
             if e.args and e.args[0].reply_code == 404:
                 raise NotFound()
             else:

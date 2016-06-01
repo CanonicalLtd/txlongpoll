@@ -107,8 +107,8 @@ class NotificationSourceTest(TestCase):
 
         # Simulate the broken being stopped
         channel.connection_close(reply_code=320, reply_text="shutdown")
-
         self.clock.advance(0)
+
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
