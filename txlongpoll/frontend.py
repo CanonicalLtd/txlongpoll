@@ -47,7 +47,7 @@ class DeprecatedQueueManager(NotificationSource):
 
     def __init__(self, prefix=None):
         super(DeprecatedQueueManager, self).__init__(
-            connector=self._get_opened_channel, prefix=prefix)
+            self._get_opened_channel, prefix=prefix)
         self.timeout = self.message_timeout
         self._channel = None
         self._client = None
@@ -72,7 +72,7 @@ class DeprecatedQueueManager(NotificationSource):
         # work.
         d = channel.basic_qos(prefetch_count=1)
         while self._pending_requests:
-            self._pending_requests.pop(0).callback((client, channel))
+            self._pending_requests.pop(0).callback(channel)
         return d
 
     @inlineCallbacks
@@ -106,15 +106,15 @@ class DeprecatedQueueManager(NotificationSource):
             queue.put(Empty)
 
     def _get_opened_channel(self):
-        """Return a L{Deferred} firing with a ready-to-use client/channel.
+        """Return a L{Deferred} firing with a ready-to-use channel.
 
-        The same client/channel will be re-used as long as it doesn't get
+        The same channel will be re-used as long as it doesn't get
         disconnected/closed.
         """
         if self._channel and not self._channel.closed:
             # If the channel is already there and still opened, just return
             # it (the client will be still connected and working as well).
-            return succeed((self._client, self._channel))
+            return succeed(self._channel)
 
         pending = Deferred()
         self._pending_requests.append(pending)

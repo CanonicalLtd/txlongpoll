@@ -43,11 +43,8 @@ class FakeConnector(object):
             self.transport = AMQPump(logger=self.logger)
             self.transport.connect(self.client)
 
-        def both(channel):
-            return self.client, channel
-
         # AMQClient.channel() will fire synchronously here
-        return self.client.channel(1).addCallback(both)
+        return self.client.channel(1)
 
 
 class NotificationSourceTest(TestCase):
@@ -70,6 +67,7 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
         self.assertThat(deferred, fires_with_payload("foo"))
 
     def test_get_with_timeout(self):
