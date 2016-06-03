@@ -7,7 +7,12 @@ Async frontend server for serving answers from background processor.
 
 import json
 
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import (
+    Deferred,
+    succeed,
+    inlineCallbacks,
+    returnValue,
+)
 from twisted.python import log
 from twisted.python.deprecate import deprecatedModuleAttribute
 from twisted.python.versions import Version
@@ -19,22 +24,33 @@ from twisted.web.http import (
     )
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
-from txamqp.queue import Empty
-from txlongpoll.message import (
+from txamqp.queue import (
+    Empty,
+)
+from txlongpoll.notification import (
     NotFound,
-    MessageSource,
+    Timeout,
+    NotificationSource,
 )
 
 
 __all__ = ["DeprecatedQueueManager", "QueueManager", "FrontEndAjax"]
 
 
-class DeprecatedQueueManager(MessageSource):
+class DeprecatedQueueManager(NotificationSource):
     """
     Legacy queue manager implementing the connected/disconnected callbacks.
     This class is deprecated and will eventually be dropped in favour of
-    MessageSource, which is designed to leverage txamqp's AMQService.
+    NotificationSource, which is designed to leverage txamqp's AMQService.
     """
+    message_timeout = NotificationSource.timeout  # For backward-compat
+
+    def __init__(self, prefix=None):
+        super(DeprecatedQueueManager, self).__init__(
+            self._get_opened_channel, prefix=prefix)
+        self.timeout = self.message_timeout
+        self._channel = None
+        self._client = None
 
     def disconnected(self):
         """
@@ -56,13 +72,50 @@ class DeprecatedQueueManager(MessageSource):
         # work.
         d = channel.basic_qos(prefetch_count=1)
         while self._pending_requests:
-            self._pending_requests.pop(0).callback(None)
+            self._pending_requests.pop(0).callback(channel)
         return d
 
-    def _wait_for_connection(self):
+    @inlineCallbacks
+    def get_message(self, uuid, sequence):
+        # XXX Backward-compatible version of NotificationSource.get.
+        notification = yield self.get(uuid, sequence)
+        message = notification._message
+        returnValue((message.content.body, message.delivery_tag))
+
+    def reject_message(self, tag):
+        """Put back a message."""
+        return self._channel.basic_reject(tag, requeue=True)
+
+    def ack_message(self, tag):
+        """Confirm the reading of a message)."""
+        return self._channel.basic_ack(tag)
+
+    @inlineCallbacks
+    def cancel_get_message(self, uuid, sequence):
         """
-        Return a L{Deferred} which will fire when the connection is available.
+        Cancel a previous C{get_message} when a request is done, to be able to
+        reuse the tag properly.
+
+        @param uuid: The identifier of the queue.
+        @param sequence: The sequential number for identifying the subscriber
+            in the queue.
         """
+        if self._client is not None:
+            tag = self._tag_form % (uuid, sequence)
+            queue = yield self._client.queue(tag)
+            queue.put(Empty)
+
+    def _get_opened_channel(self):
+        """Return a L{Deferred} firing with a ready-to-use channel.
+
+        The same channel will be re-used as long as it doesn't get
+        disconnected/closed.
+        """
+        if self._channel and not self._channel.closed:
+            # If the channel is already there and still opened, just return
+            # it (the client will be still connected and working as well).
+            return succeed(self._channel)
+
         pending = Deferred()
         self._pending_requests.append(pending)
         return pending
@@ -70,7 +123,7 @@ class DeprecatedQueueManager(MessageSource):
 QueueManager = DeprecatedQueueManager  # For backward compatibility
 deprecatedModuleAttribute(
         Version("txlongpoll", 4, 0, 0),
-        "Use txlongpoll.message.MessageSource instead.",
+        "Use txlongpoll.notification.NotificationSource instead.",
         __name__,
         "QueueManager")
 
@@ -161,7 +214,7 @@ class FrontEndAjax(Resource):
                 self._finished.pop(request_id)
                 return
 
-            if error.check(Empty):
+            if error.check(Timeout):
                 request.setResponseCode(REQUEST_TIMEOUT)
             elif error.check(NotFound):
                 request.setResponseCode(NOT_FOUND)
