@@ -19,6 +19,9 @@ from twisted.internet.address import IPv4Address
 
 from txamqp.factory import AMQFactory
 from txamqp.testing import AMQPump
+from txamqp.client import (
+    ConnectionClosed,
+)
 
 from txlongpoll.notification import (
     NotificationSource,
@@ -35,6 +38,7 @@ class FakeConnector(object):
         self.logger = logger
         self.client = None  # Current client
         self.transport = None  # Current transport
+        self.connections = 0  # Number of connections created
 
     def __call__(self):
         if self.client is None or self.client.closed:
@@ -42,6 +46,7 @@ class FakeConnector(object):
             self.client = self.factory.buildProtocol(address)
             self.transport = AMQPump(logger=self.logger)
             self.transport.connect(self.client)
+            self.connections += 1
 
         # AMQClient.channel() will fire synchronously here
         return self.client.channel(1)
@@ -56,7 +61,7 @@ class NotificationSourceTest(TestCase):
         self.clock = Clock()
         self.factory = AMQFactory(clock=self.clock)
         self.connector = FakeConnector(self.factory, logger=self.logger)
-        self.source = NotificationSource(self.connector)
+        self.source = NotificationSource(self.connector, clock=self.clock)
 
     def test_get(self):
         """
@@ -70,9 +75,10 @@ class NotificationSourceTest(TestCase):
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
         self.assertThat(deferred, fires_with_payload("foo"))
 
-    def test_get_with_timeout(self):
+    def test_get_with_queue_timeout(self):
         """
-        If the configured timeout expires, a Timeout exception is raised.
+        If the configured timeout expires while waiting for a message, from
+        the subscribed queued, d Timeout exception is raised.
         """
         deferred = self.source.get("uuid", 1)
         channel = self.connector.transport.channel(1)
@@ -80,6 +86,96 @@ class NotificationSourceTest(TestCase):
         self.clock.advance(self.source.timeout)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
         self.assertThat(deferred, fires_with_timeout())
+
+    def test_get_with_retry_loop_timeout(self):
+        """
+        The retry loop gets interrupted it hits the configured timeout, and
+        a Timeout exceptionis raised.
+        """
+        deferred = self.source.get("uuid", 1)
+
+        # Let some time elapse and fail the first try.
+        channel = self.connector.transport.channel(1)
+        self.clock.advance(self.source.timeout / 2)
+        channel.connection_close(reply_code=320)
+        self.clock.advance(0)
+
+        # Let some more time elapse and fail the second try too (this time
+        # with a queue timeout).
+        channel = self.connector.transport.channel(1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        self.clock.advance(self.source.timeout / 2)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+
+        self.assertEquals(2, self.connector.connections)
+        self.assertThat(deferred, fires_with_timeout())
+
+    def test_get_with_retry_after_connection_lost(self):
+        """
+        The retry loop gets interrupted it hits the configured timeout, and
+        a Timeout exceptionis raised.
+        """
+        deferred = self.source.get("uuid", 1)
+
+        # Let some time elapse and fail the first try.
+        channel = self.connector.transport.channel(1)
+        self.clock.advance(self.source.timeout / 2)
+        channel.connection_close(reply_code=320)
+        self.clock.advance(0)
+
+        # Let some more time elapse and fail the second try too (this time
+        # with a queue timeout).
+        channel = self.connector.transport.channel(1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        self.clock.advance(self.source.timeout / 2)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+
+        self.assertEquals(2, self.connector.connections)
+        self.assertThat(deferred, fires_with_timeout())
+
+    def test_get_with_heartbeat_check_failure(self):
+        """
+        If the connection gets dropped because of a heartbeat check failure,
+        we keep trying again.
+        """
+        self.factory.setHeartbeat(1)
+        deferred = self.source.get("uuid", 1)
+        self.clock.advance(1)
+        self.clock.advance(1)
+        self.clock.advance(1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+        self.assertEquals(2, self.connector.connections)
+        self.assertThat(deferred, fires_with_payload("foo"))
+
+    def test_get_with_transport_error(self):
+        """
+        If the connection gets dropped because of a transport failure (e.g.
+        the TCP socket got closed), we keep retrying.
+        """
+        deferred = self.source.get("uuid", 1)
+        self.connector.transport.loseConnection()
+        self.clock.advance(0)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+        self.assertEquals(2, self.connector.connections)
+        self.assertThat(deferred, fires_with_payload("foo"))
+
+    def test_get_with_connection_closed_unexpected(self):
+        """
+        If we got a connection-closed message from the broker with an
+        unexpected error code, we raise an error.
+        """
+        deferred = self.source.get("uuid", 1)
+        channel = self.connector.transport.channel(1)
+        channel.connection_close(reply_code=501)
+        self.assertThat(deferred, fires_with_connection_closed())
 
     def test_get_with_timeout_and_pending_message(self):
         """
@@ -141,3 +237,9 @@ def fires_with_not_found():
     """Assert that a notification request fails with a NotFound"""
     return failed(
          AfterPreprocessing(lambda f: f.value, IsInstance(NotFound)))
+
+
+def fires_with_connection_closed():
+    """Assert that a notification request fails with a NotFound"""
+    return failed(
+         AfterPreprocessing(lambda f: f.value, IsInstance(ConnectionClosed)))
