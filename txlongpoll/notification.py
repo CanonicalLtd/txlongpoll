@@ -190,7 +190,7 @@ class NotificationSource(object):
 
 
 class _Retriable(Exception):
-    """Raised by NotificationSource._do() in case of transient errors."""
+    """Raised by _check_retry in case of transient errors."""
 
 
 @inlineCallbacks
