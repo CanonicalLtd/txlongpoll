@@ -14,6 +14,7 @@ See also txlongpoll.frontend.FrontEndAjax.
 from twisted.internet import reactor
 from twisted.internet.error import ConnectionClosed as TransportClosed
 from twisted.internet.defer import (
+    DeferredLock,
     inlineCallbacks,
     returnValue,
 )
@@ -49,6 +50,46 @@ class Timeout(Exception):
     """
 
 
+class NotificationConnector(object):
+    """Provide ready-to-use AMQP channels."""
+
+    def __init__(self, service):
+        """
+        @param service: An object implementing the same whenConnected() API as
+            the twisted.application.internet.ClientService class.
+        """
+        self._service = service
+        self._channel = None
+        self._channel_lock = DeferredLock()
+
+    @inlineCallbacks
+    def __call__(self):
+        """
+        @return: A deferred firing with a ready-to-use txamqp.protocol.Channel.
+        """
+        # Serialize calls, in order to setup new channels only once.
+        yield self._channel_lock.acquire()
+        try:
+            client = yield self._service.whenConnected()
+            channel = yield client.channel(1)
+            # Check if we got a new channel, and initialize it if so.
+            if channel is not self._channel:
+                self._channel = channel
+                yield self._channel.channel_open()
+                # This tells the broker to deliver us at most one message at
+                # a time to support using multiple processes (e.g. in a
+                # load-balanced/HA deployment). If NotificationSource.get()
+                # gets called against the same UUID first by process A and then
+                # when it completes by process B, we're guaranteed that process
+                # B will see the very next message in the queue, because
+                # process A hasn't fetched any more messages than the one it
+                # received. See #729140.
+                yield self._channel.basic_qos(prefetch_count=1)
+        finally:
+            self._channel_lock.release()
+        returnValue(self._channel)
+
+
 class Notification(object):
     """A single notification from a stream."""
 
@@ -67,10 +108,11 @@ class Notification(object):
         return self._message.content.body
 
     def ack(self):
-        """Confirm the reading of a message)."""
+        """Confirm that the notification was successfully processed."""
         return self._channel.basic_ack(self._message.delivery_tag)
 
     def reject(self):
+        """Reject the the notification, it will be re-queued."""
         return self._channel.basic_reject(
             self._message.delivery_tag, requeue=True)
 
@@ -102,7 +144,7 @@ class NotificationSource(object):
         self._connector = connector
         self._prefix = prefix
         self._clock = clock
-        self._pending_requests = []
+        self._consume_lock = DeferredLock()
         # Preserve compatibility by using special forms for naming when a
         # prefix is specified.
         if self._prefix is not None and len(self._prefix) != 0:
@@ -149,6 +191,12 @@ class NotificationSource(object):
         If we hit a transient error, the _Retriable exception will be raised.
         """
         tag = self._tag_form % (uuid, sequence)
+        # Serialize calls to basic_consume, because in case get() gets called
+        # concurrently we don't want two basic_consume calls in flight at the
+        # same time, since in case of a 404 failure txamqp would errback both
+        # calls and AMQP formally gives no hint about which queue the failure
+        # is for.
+        yield self._consume_lock.acquire()
         try:
             yield _check_retriable(
                 channel.basic_consume, consumer_tag=tag,
@@ -157,9 +205,17 @@ class NotificationSource(object):
             # If the broker sent us channel-close because the queue doesn't
             # exists, raise NotFound. Otherwise just propagate.
             if error.args[0].reply_code == 404:
-                channel.client.close()
+                # Try to terminate the AMQP connection cleanly (by sending the
+                # 'close' message), but if we fail let's force a transport
+                # shutdown.
+                try:
+                    yield channel.client.close()
+                except:
+                    channel.client.abortConnection()
                 raise NotFound()
             raise
+        finally:
+            self._consume_lock.release()
 
         log.msg("Consuming from queue '%s'" % uuid)
 
@@ -194,10 +250,20 @@ class _Retriable(Exception):
 
 
 @inlineCallbacks
-def _check_retriable(function, *args, **kwargs):
-    """Invoke the given channel function and check for transient errors."""
+def _check_retriable(method, **kwargs):
+    """Invoke the given channel method and check for transient errors.
+
+    @param method: A bound method of a txamqp.protocol.AMQChannel instance.
+    @param kwargs: The keyword arguments to pass to the method.
+    """
+    channel = method.im_self
+    if channel.closed:
+        # The channel got closed, e.g. because another call to
+        # NotificationSource._do() hit an error. In this case we just want
+        # to retry.
+        raise _Retriable()
     try:
-        yield function(*args, **kwargs)
+        yield method(**kwargs)
     except ConnectionClosed as error:
         # 320 (conncetion-forced) and 541 (internal-error) are transient
         # errors that can be retried, the most common being 320 which
