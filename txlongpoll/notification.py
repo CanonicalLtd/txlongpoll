@@ -150,7 +150,7 @@ class NotificationSource(object):
         """
         tag = self._tag_form % (uuid, sequence)
         try:
-            yield _check_retry(
+            yield _check_retriable(
                 channel.basic_consume, consumer_tag=tag,
                 queue=self._queue_form % uuid)
         except ChannelClosed as error:
@@ -175,7 +175,7 @@ class NotificationSource(object):
             # Let's retry after reconnection.
             raise _Retriable()
 
-        yield _check_retry(channel.basic_cancel, consumer_tag=tag)
+        yield _check_retriable(channel.basic_cancel, consumer_tag=tag)
 
         channel.client.queues.pop(tag, None)
 
@@ -190,18 +190,14 @@ class NotificationSource(object):
 
 
 class _Retriable(Exception):
-    """Raised by NotificationSource._do() in case of transient errors."""
+    """Raised by _check_retriable in case of transient errors."""
 
 
 @inlineCallbacks
-def _check_retry(function, *args, **kwargs):
+def _check_retriable(function, *args, **kwargs):
     """Invoke the given channel function and check for transient errors."""
     try:
         yield function(*args, **kwargs)
-    except ChannelClosed:
-        # The channel error we could possibly retry is 404, but that's
-        # handled in NotificationSource_do(), so here we just propagate it.
-        raise
     except ConnectionClosed as error:
         # 320 (conncetion-forced) and 541 (internal-error) are transient
         # errors that can be retried, the most common being 320 which
