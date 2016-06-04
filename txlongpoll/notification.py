@@ -11,6 +11,7 @@ queues.
 See also txlongpoll.frontend.FrontEndAjax.
 """
 
+from twisted.internet import reactor
 from twisted.internet.defer import (
     inlineCallbacks,
     returnValue,
@@ -74,18 +75,20 @@ class NotificationSource(object):
     # is 5 minutes.
     timeout = 270
 
-    def __init__(self, connector, prefix=None):
+    def __init__(self, connector, prefix=None, clock=reactor):
         """
         @param connector: A callable returning a deferred which should fire
-            with a connected AMQClient and an opened AMQChannel. The deferred
-            is expected to never errback (typically it will be fired by some
-            code which in case of failure keeps retrying to connect to a broker
-            or a cluster of brokers).
+            with an opened AMQChannel. The deferred is expected to never
+            errback (typically it will be fired by some code which in case
+            of failure keeps retrying to connect to a broker or a cluster
+            of brokers).
         @param prefix: Optional prefix for identifying the AMQP queues we
             should consume messages from.
+        @param clock: An object implementing IReactorTime.
         """
         self._connector = connector
         self._prefix = prefix
+        self._clock = clock
         self._pending_requests = []
         # Preserve compatibility by using special forms for naming when a
         # prefix is specified.
@@ -111,7 +114,7 @@ class NotificationSource(object):
         If no notification is received within the number of seconds in
         L{timeout}, then the returned Deferred will errback with L{Timeout}.
         """
-        client, channel = yield self._connector()
+        channel = yield self._connector()
         tag = self._tag_form % (uuid, sequence)
         try:
             yield channel.basic_consume(
@@ -119,12 +122,12 @@ class NotificationSource(object):
 
             log.msg("Consuming from queue '%s'" % uuid)
 
-            queue = yield client.queue(tag)
+            queue = yield channel.client.queue(tag)
             msg = yield queue.get(self.timeout)
         except Empty:
             # Let's wait for the cancel here
             yield channel.basic_cancel(consumer_tag=tag)
-            client.queues.pop(tag, None)
+            channel.client.queues.pop(tag, None)
             # Check for the messages arrived in the mean time
             if queue.pending:
                 msg = queue.pending.pop()
@@ -134,20 +137,20 @@ class NotificationSource(object):
             # The queue has been closed, presumably because of a side effect.
             # Let's retry after reconnection.
             notification = yield deferLater(
-                client.clock, 0, self.get, uuid, sequence)
+                self._clock, 0, self.get, uuid, sequence)
             returnValue(notification)
         except Closed, e:
-            client.close(ConnectionDone())
+            channel.client.close(ConnectionDone())
             if e.args and e.args[0].reply_code == 404:
                 raise NotFound()
             else:
                 raise
         except:
-            if client and client.transport:
-                client.transport.loseConnection()
+            if channel.client and channel.client.transport:
+                channel.client.transport.loseConnection()
             raise
 
         yield channel.basic_cancel(consumer_tag=tag, nowait=True)
-        client.queues.pop(tag, None)
+        channel.client.queues.pop(tag, None)
 
         returnValue(Notification(msg, channel))

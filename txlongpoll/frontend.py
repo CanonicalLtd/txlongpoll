@@ -72,7 +72,7 @@ class DeprecatedQueueManager(NotificationSource):
         # work.
         d = channel.basic_qos(prefetch_count=1)
         while self._pending_requests:
-            self._pending_requests.pop(0).callback((client, channel))
+            self._pending_requests.pop(0).callback(channel)
         return d
 
     @inlineCallbacks
@@ -114,7 +114,7 @@ class DeprecatedQueueManager(NotificationSource):
         if self._channel and not self._channel.closed:
             # If the channel is already there and still opened, just return
             # it (the client will be still connected and working as well).
-            return succeed((self._client, self._channel))
+            return succeed(self._channel)
 
         pending = Deferred()
         self._pending_requests.append(pending)

@@ -43,11 +43,8 @@ class FakeConnector(object):
             self.transport = AMQPump(logger=self.logger)
             self.transport.connect(self.client)
 
-        def both(channel):
-            return self.client, channel
-
         # AMQClient.channel() will fire synchronously here
-        return self.client.channel(1).addCallback(both)
+        return self.client.channel(1)
 
 
 class NotificationSourceTest(TestCase):
@@ -59,7 +56,7 @@ class NotificationSourceTest(TestCase):
         self.clock = Clock()
         self.factory = AMQFactory(clock=self.clock)
         self.connector = FakeConnector(self.factory, logger=self.logger)
-        self.source = NotificationSource(self.connector)
+        self.source = NotificationSource(self.connector, clock=self.clock)
 
     def test_get(self):
         """
