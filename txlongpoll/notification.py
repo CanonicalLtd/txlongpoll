@@ -50,6 +50,46 @@ class Timeout(Exception):
     """
 
 
+class NotificationConnector(object):
+    """Provide ready-to-use AMQP channels."""
+
+    def __init__(self, service):
+        """
+        @param service: An object implementing the same whenConnected() API as
+            the twisted.application.internet.ClientService class.
+        """
+        self._service = service
+        self._channel = None
+        self._channel_lock = DeferredLock()
+
+    @inlineCallbacks
+    def __call__(self):
+        """
+        @return: A deferred firing with a ready-to-use txamqp.protocol.Channel.
+        """
+        # Serialize calls, in order to setup new channels only once.
+        yield self._channel_lock.acquire()
+        try:
+            client = yield self._service.whenConnected()
+            channel = yield client.channel(1)
+            # Check if we got a new channel, and initialize it if so.
+            if channel is not self._channel:
+                self._channel = channel
+                yield self._channel.channel_open()
+                # This tells the broker to deliver us at most one message at
+                # a time to support using multiple processes (e.g. in a
+                # load-balanced/HA deployment). If NotificationSource.get()
+                # gets called against the same UUID first by process A and then
+                # when it completes by process B, we're guaranteed that process
+                # B will see the very next message in the queue, because
+                # process A hasn't fetched any more messages than the one it
+                # received. See #729140.
+                yield self._channel.basic_qos(prefetch_count=1)
+        finally:
+            self._channel_lock.release()
+        returnValue(self._channel)
+
+
 class Notification(object):
     """A single notification from a stream."""
 
