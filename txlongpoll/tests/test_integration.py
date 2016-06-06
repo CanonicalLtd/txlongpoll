@@ -3,6 +3,8 @@
 
 """Integration tests running a real RabbitMQ broker."""
 
+from rabbitfixture.server import RabbitServerResources
+
 from twisted.internet import reactor
 from twisted.internet.defer import (
     inlineCallbacks,
@@ -12,24 +14,297 @@ from twisted.internet.task import (
     Clock,
     deferLater,
     )
+from twisted.application.internet import (
+    backoffPolicy,
+    ClientService,
+)
 
 from txamqp.content import Content
 from txamqp.protocol import (
     AMQChannel,
     AMQClient,
 )
+from txamqp.factory import AMQFactory
+from txamqp.endpoint import AMQEndpoint
 
 from testtools.deferredruntest import assert_fails_with
 
 from txlongpoll.notification import (
+    NotificationConnector,
+    NotificationSource,
     NotFound,
     Timeout,
 )
 from txlongpoll.frontend import DeprecatedQueueManager
-from txlongpoll.testing.client import (
+from txlongpoll.testing.integration import (
+    IntegrationTest,
     AMQTest,
     QueueWrapper,
 )
+
+
+class NotificationSourceIntegrationTest(IntegrationTest):
+
+    @inlineCallbacks
+    def setUp(self):
+        super(NotificationSourceIntegrationTest, self).setUp()
+        self.endpoint = AMQEndpoint(
+            reactor, self.rabbit.config.hostname, self.rabbit.config.port,
+            username="guest", password="guest")
+        self.policy = backoffPolicy(initialDelay=0)
+        self.service = ClientService(
+            self.endpoint, AMQFactory(), retryPolicy=self.policy)
+        self.connector = NotificationConnector(self.service)
+        self.source = NotificationSource(self.connector)
+
+        self.client = yield self.endpoint.connect(AMQFactory())
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
+
+        self.service.startService()
+
+    @inlineCallbacks
+    def tearDown(self):
+        self.service.stopService()
+        super(NotificationSourceIntegrationTest, self).tearDown()
+        # Wrap resetting queues and client in a try/except, since the broker
+        # may have been stopped (e.g. when this is the last test being run).
+        try:
+            yield self.channel.queue_delete(queue="uuid")
+            yield self.client.close()
+        except:
+            pass
+
+    @inlineCallbacks
+    def test_get_after_publish(self):
+        """
+        Calling get() after a message has been published in the associated
+        queue, returns a Notification for that message.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield self.source.get("uuid", 0)
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_before_publish(self):
+        """
+        Calling get() before a message has been published in the associated
+        queue, will wait until publication.
+        """
+        deferred = self.source.get("uuid", 0)
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield deferred
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_reject_notification(self):
+        """
+        Calling reject() on a Notification puts the associated message back in
+        the queue so that it's available to subsequent get() calls.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield self.source.get("uuid", 0)
+        yield notification.reject()
+
+        notification = yield self.source.get("uuid", 1)
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_ack_message(self):
+        """
+        Calling ack() on a Notification confirms the removal of the
+        associated message from the queue, making subsequent calls
+        waiting for another message.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield self.source.get("uuid", 0)
+        yield notification.ack()
+
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello 2"))
+        notification = yield self.source.get("uuid", 1)
+        self.assertEqual("hello 2", notification.payload)
+
+    @inlineCallbacks
+    def test_get_with_error(self):
+        """
+        If an error occurs in during get(), the client is closed so
+        we can query messages again.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        try:
+            yield self.source.get("uuid-unknown", 0)
+        except NotFound:
+            pass
+        else:
+            self.fail("NotFound wasn't raised")
+        notification = yield self.source.get("uuid", 0)
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_concurrent_with_error(self):
+        """
+        If an error occurs in a call to get(), other calls don't
+        fail, and are retried on reconnection instead.
+        """
+        client1 = yield self.service.whenConnected()
+        deferred = self.source.get("uuid", 0)
+
+        try:
+            yield self.source.get("uuid-unknown", 0)
+        except NotFound:
+            pass
+        else:
+            self.fail("NotFound wasn't raised")
+
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield deferred
+        self.assertEquals("hello", notification.payload)
+        client2 = yield self.service.whenConnected()
+        # The ClientService has reconnected, yielding a new client.
+        self.assertIsNot(client1, client2)
+
+    @inlineCallbacks
+    def test_get_timeout(self):
+        """
+        Calls to get() timeout after a certain amount of time if no message
+        arrived on the queue.
+        """
+        self.source.timeout = 1
+        try:
+            yield self.source.get("uuid", 0)
+        except Timeout:
+            pass
+        else:
+            self.fail("Timeout not raised")
+        client = yield self.service.whenConnected()
+        channel = yield client.channel(1)
+        # The channel is still opened
+        self.assertFalse(channel.closed)
+        # The consumer has been deleted
+        self.assertNotIn("uuid.0", client.queues)
+
+    @inlineCallbacks
+    def test_get_with_broker_shutdown_during_consume(self):
+        """
+        If rabbitmq gets shutdown during the basic-consume call, we wait
+        for the reconection and retry transparently.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Restart rabbitmq
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the restart has
+        # destroyed it.
+        client = yield self.endpoint.connect(AMQFactory())
+        channel = yield client.channel(1)
+        yield channel.channel_open()
+        yield channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_with_broker_die_during_consume(self):
+        """
+        If rabbitmq dies during the basic-consume call, we wait for the
+        reconection and retry transparently.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Kill rabbitmq and start it again
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.runner.kill()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the crash has
+        # destroyed it.
+        client = yield self.endpoint.connect(AMQFactory())
+        channel = yield client.channel(1)
+        yield channel.channel_open()
+        yield channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_wb_get_with_broker_shutdown_during_message_wait(self):
+        """
+        If rabbitmq gets shutdown while we wait for messages, we transparently
+        wait for the reconnection and try again.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Acquiring the channel lock makes sure that basic-consume has
+        # succeeded and we started waiting for the message.
+        yield self.source._channel_lock.acquire()
+        self.source._channel_lock.release()
+
+        # Restart rabbitmq
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the restart has
+        # destroyed it.
+        client = yield self.endpoint.connect(AMQFactory())
+        channel = yield client.channel(1)
+        yield channel.channel_open()
+        yield channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
 
 
 class DeprecatedQueueManagerTest(AMQTest):

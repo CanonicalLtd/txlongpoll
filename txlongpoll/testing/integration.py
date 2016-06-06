@@ -46,12 +46,15 @@ class RabbitServerWithoutReset(RabbitServer):
         """
 
 
-class AMQTest(ResourcedTestCase, TestCase):
+class IntegrationTest(ResourcedTestCase, TestCase):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
-        timeout=5)
+        timeout=10)
 
     resources = [('rabbit', FixtureResource(RabbitServerWithoutReset()))]
+
+
+class AMQTest(IntegrationTest):
 
     VHOST = "/"
     USER = "guest"
