@@ -180,21 +180,22 @@ class FrontEndAjax(Resource):
 
         request.notifyFinish().addBoth(_finished)
 
-        d = self.message_queue.get(uuid, sequence)
+        d = self.message_queue.get_message(uuid, sequence)
 
-        def write(notification):
+        def write(data):
+            result, tag = data
             if self._finished.get(request_id):
                 self._finished.pop(request_id)
-                notification.reject()
+                self.message_queue.reject_message(tag)
                 return
 
-            notification.ack()
+            self.message_queue.ack_message(tag)
 
-            data = json.loads(notification.payload)
+            data = json.loads(result)
 
             if data.pop("original-uuid", None) == uuid:
                 # Ignore the message for the page who emitted the job
-                d = self.message_queue.get(uuid, sequence)
+                d = self.message_queue.get_message(uuid, sequence)
                 d.addCallback(write)
                 d.addErrback(failed)
                 return
@@ -204,7 +205,7 @@ class FrontEndAjax(Resource):
 
             request.setHeader("Content-Type", "application/json")
 
-            request.write(notification.payload)
+            request.write(result)
             self._finished[request_id] = False
             request.finish()
 
