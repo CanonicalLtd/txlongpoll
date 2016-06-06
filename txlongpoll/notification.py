@@ -18,7 +18,6 @@ from twisted.internet.defer import (
     inlineCallbacks,
     returnValue,
 )
-from twisted.internet.task import deferLater
 from twisted.python import log
 from twisted.python.failure import Failure
 from txamqp.client import (
@@ -139,11 +138,8 @@ class NotificationSource(object):
                 notification = yield self._do(channel, uuid, sequence, timeout)
                 returnValue(notification)
             except _Retriable:
-                # Wait a single main loop iteration before actually retrying,
-                # since we might be in the middle of running callbacks for
-                # AMQChannel.doClose or AMQClient.doClose and hence not fully
-                # disconnected yet.
-                yield deferLater(self._clock, 0, lambda: None)
+                # Wait for the connection to shutdown.
+                yield channel.client.disconnected.wait()
                 timeout -= self._clock.seconds() - now
                 continue
         raise Timeout()

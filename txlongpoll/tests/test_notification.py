@@ -89,20 +89,19 @@ class NotificationSourceTest(TestCase):
 
     def test_get_with_retry_loop_timeout(self):
         """
-        The retry loop gets interrupted it hits the configured timeout, and
+        The retry loop gets interrupted if hits the configured timeout, and
         a Timeout exceptionis raised.
         """
         deferred = self.source.get("uuid", 1)
 
-        # Let some time elapse and fail the first try.
+        # Let some time elapse and fail the first try simulating a broker
+        # shutdown.
         channel = self.connector.transport.channel(1)
         self.clock.advance(self.source.timeout / 2)
         channel.connection_close(reply_code=320)
-        self.clock.advance(0)
 
         # Let some more time elapse and fail the second try too (this time
         # with a queue timeout).
-        channel = self.connector.transport.channel(1)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         self.clock.advance(self.source.timeout / 2)
@@ -122,7 +121,6 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(1)
         self.clock.advance(self.source.timeout / 2)
         channel.connection_close(reply_code=320)
-        self.clock.advance(0)
 
         # Let some more time elapse and fail the second try too (this time
         # with a queue timeout).
@@ -159,7 +157,6 @@ class NotificationSourceTest(TestCase):
         """
         deferred = self.source.get("uuid", 1)
         self.connector.transport.loseConnection()
-        self.clock.advance(0)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
@@ -201,7 +198,6 @@ class NotificationSourceTest(TestCase):
 
         # Simulate the broken being stopped
         channel.connection_close(reply_code=320, reply_text="shutdown")
-        self.clock.advance(0)
 
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
@@ -237,7 +233,6 @@ class NotificationSourceTest(TestCase):
         self.assertThat(deferred1, fires_with_not_found())
 
         # The second call will be retried
-        self.clock.advance(0)
         self.assertEqual(2, self.connector.connections)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid2.1")
