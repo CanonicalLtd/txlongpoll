@@ -10,6 +10,7 @@ queues.
 
 See also txlongpoll.frontend.FrontEndAjax.
 """
+from functools import partial
 
 from twisted.internet import reactor
 from twisted.internet.error import ConnectionClosed as TransportClosed
@@ -48,6 +49,10 @@ class Timeout(Exception):
 
     The value of the timeout is defined by NotificationSource.timeout.
     """
+
+
+class Bounced(Exception):
+    """Raised if a Notification could not be ack'ed or rejected."""
 
 
 class NotificationConnector(object):
@@ -104,18 +109,29 @@ class NotificationConnector(object):
 class Notification(object):
     """A single notification from a stream."""
 
-    def __init__(self, source, message):
+    def __init__(self, source, channel, message):
         """
-        @param source: The NotificationSource the message was received through.
+        @param source: The NotificationSource that generated the notification.
+        @param channel: The AMQChannel the message was received through.
         @param message: The raw txamqp.message.Message received from the
             underlying AMQP queue.
         """
         self._source = source
+        self._channel = channel
         self._message = message
 
     @property
     def payload(self):
+        """Return the content of the notification."""
         return self._message.content.body
+
+    def ack(self):
+        """Confirm that the notification was successfully processed."""
+        return self._source._done(self, True)
+
+    def reject(self):
+        """Reject the the notification, it will be re-queued."""
+        return self._source._done(self, False)
 
 
 class NotificationSource(object):
@@ -235,7 +251,7 @@ class NotificationSource(object):
             else:
                 raise Timeout()
 
-        returnValue(Notification(self, msg))
+        returnValue(Notification(self, channel, msg))
 
     @inlineCallbacks
     def _check_retriable(self, method, **kwargs):
@@ -272,6 +288,32 @@ class NotificationSource(object):
                 if isinstance(reason.value, TransportClosed):
                     raise _Retriable()
             raise
+        finally:
+            self._channel_lock.release()
+
+    @inlineCallbacks
+    def _done(self, notification, successful):
+        """Confirm that a notification has been handled (successfully or not).
+
+        @param notification: The Notification to confirm.
+        @param successful: If True, then the notification has been correctly
+            processed and will be deleted. If False, it will be re-queued and
+            be available at the next NotificationSource.get() call for the
+            same UUID.
+        """
+        channel = notification._channel
+        if successful:
+            method = channel.basic_ack
+        else:
+            method = partial(channel.basic_reject, requeue=True)
+
+        yield self._channel_lock.acquire()
+        try:
+            yield method(delivery_tag=notification._message.delivery_tag)
+        except Closed:
+            # If we hit any channel or connection error, we raise an error
+            # since there's no way this can be re-tried.
+            raise Bounced()
         finally:
             self._channel_lock.release()
 
