@@ -20,12 +20,12 @@ from twisted.internet.defer import (
 )
 from twisted.internet.task import deferLater
 from twisted.python import log
+from twisted.python.failure import Failure
 from txamqp.client import (
     Closed,
     ConnectionClosed,
     ChannelClosed,
 )
-from txamqp.protocol import HeartbeatTimeout
 from txamqp.queue import (
     Closed as QueueClosed,
     Empty,
@@ -239,8 +239,7 @@ def _check_retriable(method, **kwargs):
         raise
     except Closed as error:
         reason = error.args[0]
-        if isinstance(reason, HeartbeatTimeout):
-            raise _Retriable()
-        if isinstance(reason, TransportClosed):
-            raise _Retriable()
+        if isinstance(reason, Failure):
+            if isinstance(reason.value, TransportClosed):
+                raise _Retriable()
         raise
