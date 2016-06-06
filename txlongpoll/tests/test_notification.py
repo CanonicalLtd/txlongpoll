@@ -207,8 +207,8 @@ class NotificationSourceTest(TestCase):
 
     def test_get_with_queue_not_found(self):
         """
-        If the queue we're consuming from gets closed for whatever reason
-        (for example the client got disconnected), we try again.
+        If we try to consume from a queue that doesn't exist, NotFound is
+        raised.
         """
         deferred = self.source.get("uuid", 1)
         channel = self.connector.transport.channel(1)
