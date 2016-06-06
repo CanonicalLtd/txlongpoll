@@ -242,8 +242,8 @@ class NotificationSource(object):
             # Check for the messages arrived in the mean time
             if queue.pending:
                 msg = queue.pending.pop()
-                returnValue(Notification(msg, channel))
-            raise Timeout()
+            else:
+                raise Timeout()
 
         returnValue(Notification(msg, channel))
 
