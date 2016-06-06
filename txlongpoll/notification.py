@@ -52,15 +52,14 @@ class Timeout(Exception):
 class Notification(object):
     """A single notification from a stream."""
 
-    def __init__(self, message, channel):
+    def __init__(self, source, message):
         """
+        @param source: The NotificationSource the message was received through.
         @param message: The raw txamqp.message.Message received from the
             underlying AMQP queue.
-        @param channel: The txamqp.protocol.Channel the message was received
-            through.
         """
+        self._source = source
         self._message = message
-        self._channel = channel
 
     @property
     def payload(self):
@@ -193,7 +192,7 @@ class NotificationSource(object):
             else:
                 raise Timeout()
 
-        returnValue(Notification(msg, channel))
+        returnValue(Notification(self, msg))
 
     @inlineCallbacks
     def _check_retriable(self, method, **kwargs):
