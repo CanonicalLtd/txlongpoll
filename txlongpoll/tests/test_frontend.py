@@ -14,27 +14,21 @@ from twisted.internet.defer import (
 from txlongpoll.frontend import FrontEndAjax
 
 
-class FakeNotification(object):
-
-    def __init__(self, payload):
-        self.payload = payload
-
-    def ack(self):
-        pass
-
-
 class FakeMessageQueue(object):
 
     def __init__(self):
         self.messages = {}
         self._prefix = "test"
 
-    def get(self, uuid, sequence):
+    def get_message(self, uuid, sequence):
         message = self.messages[uuid]
         if isinstance(message, Exception):
             return fail(message)
         else:
-            return succeed(FakeNotification(message))
+            return succeed((message, "tag"))
+
+    def ack_message(self, tag):
+        pass
 
 
 class FakeRequest(object):
@@ -79,7 +73,7 @@ class FrontEndAjaxTest(TestCase):
 
     def test_render_success(self):
         """
-        L{FrontEndAjax.render} displays the message got via get() after
+        L{FrontEndAjax.render} displays the message got via get_message after
         getting the uuid from the request.
         """
         body = json.dumps({"result": "some content"})
@@ -98,10 +92,10 @@ class FrontEndAjaxTest(TestCase):
         body2 = json.dumps({"result": "some other content"})
         messages = [body1, body2]
 
-        def get(uuid, sequence):
-            return succeed(FakeNotification(messages.pop(0)))
+        def get_message(uuid, sequence):
+            return succeed((messages.pop(0), "tag"))
 
-        self.message_queue.get = get
+        self.message_queue.get_message = get_message
 
         request = FakeRequest({"uuid": ["uuid1"], "sequence": ["0"]})
         self.ajax.render(request)
@@ -122,7 +116,7 @@ class FrontEndAjaxTest(TestCase):
 
     def test_render_error(self):
         """
-        L{FrontEndAjax.render} displays an error if C{get} raises an
+        L{FrontEndAjax.render} displays an error if C{get_message} raises an
         exception.
         """
         self.message_queue.messages["uuid1"] = ValueError("Not there")

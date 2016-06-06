@@ -117,15 +117,6 @@ class Notification(object):
     def payload(self):
         return self._message.content.body
 
-    def ack(self):
-        """Confirm that the notification was successfully processed."""
-        return self._channel.basic_ack(self._message.delivery_tag)
-
-    def reject(self):
-        """Reject the the notification, it will be re-queued."""
-        return self._channel.basic_reject(
-            self._message.delivery_tag, requeue=True)
-
 
 class NotificationSource(object):
     """
