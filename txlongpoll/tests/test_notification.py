@@ -57,7 +57,7 @@ class NotificationConnectorTest(TestCase):
         self.clock = Clock()
         self.factory = AMQFactory(clock=self.clock)
         self.service = FakeClientService(self.factory)
-        self.connector = NotificationConnector(self.service)
+        self.connector = NotificationConnector(self.service, clock=self.clock)
 
     def test_fresh_channel(self):
         """
@@ -91,6 +91,7 @@ class NotificationConnectorTest(TestCase):
         channel.basic_qos_ok()
         self.service.client.close()
         deferred = self.connector()
+        self.clock.advance(0)
         channel = self.service.transport.channel(1)
         channel.channel_open_ok()
         channel.basic_qos_ok()
