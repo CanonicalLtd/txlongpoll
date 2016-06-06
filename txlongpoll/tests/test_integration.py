@@ -100,37 +100,6 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         self.assertEqual("hello", notification.payload)
 
     @inlineCallbacks
-    def test_reject_notification(self):
-        """
-        Calling reject() on a Notification puts the associated message back in
-        the queue so that it's available to subsequent get() calls.
-        """
-        yield self.channel.basic_publish(
-            routing_key="uuid", content=Content("hello"))
-        notification = yield self.source.get("uuid", 0)
-        yield notification.reject()
-
-        notification = yield self.source.get("uuid", 1)
-        self.assertEqual("hello", notification.payload)
-
-    @inlineCallbacks
-    def test_ack_message(self):
-        """
-        Calling ack() on a Notification confirms the removal of the
-        associated message from the queue, making subsequent calls
-        waiting for another message.
-        """
-        yield self.channel.basic_publish(
-            routing_key="uuid", content=Content("hello"))
-        notification = yield self.source.get("uuid", 0)
-        yield notification.ack()
-
-        yield self.channel.basic_publish(
-            routing_key="uuid", content=Content("hello 2"))
-        notification = yield self.source.get("uuid", 1)
-        self.assertEqual("hello 2", notification.payload)
-
-    @inlineCallbacks
     def test_get_with_error(self):
         """
         If an error occurs in during get(), the client is closed so
