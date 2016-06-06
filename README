@@ -8,21 +8,12 @@ By default txlongpoll attempts to build without going to the network;
 instead it tries to find all dependencies from download-cache/dist,
 and you must download all the dependencies yourself.
 
-If you prefer to use resources from the 'net, PyPI for example, then:
+If you prefer to use resources from the 'net, PyPI for example, then
+prepend OFFLINE=0 to your make commands:
 
-- Remove the --setup-source and --download-base options in Makefile to
-  allow bootstrap.py to download setuptools.
+- OFFLINE=0 make build
 
-- Comment out the ``install-from-cache = true`` line in buildout.cfg
-  to allow bin/buildout to download dependencies.
-
-To run the tests you may also need lp:rabbitfixture (bzr branch
-lp:rabbitfixture). Build an sdist tarball and drop it into
-download-cache/dist. You may also need to do the same for
-testresources-0.2.4_r58 until it reaches PyPI.
-
-txlongpoll needs a recent RabbitMQ with support for rejection. Maverick's
-1.8.0 is not sufficient, but 2.1.1 works fine, so >= Natty is OK.
+- OFFLINE=0 make check
 
 
 Building
