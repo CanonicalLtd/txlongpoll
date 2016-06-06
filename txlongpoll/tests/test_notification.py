@@ -228,8 +228,6 @@ class NotificationSourceTest(TestCase):
         # Make the first call fail with 404
         channel = self.connector.transport.channel(1)
         channel.channel_close(reply_code=404, reply_text="not found")
-        channel = self.connector.transport.channel(0)
-        channel.connection_close_ok()
         self.assertThat(deferred1, fires_with_not_found())
 
         # The second call will be retried

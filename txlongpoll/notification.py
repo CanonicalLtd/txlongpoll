@@ -103,7 +103,7 @@ class NotificationSource(object):
         self._connector = connector
         self._prefix = prefix
         self._clock = clock
-        self._consume_lock = DeferredLock()
+        self._channel_lock = DeferredLock()
         # Preserve compatibility by using special forms for naming when a
         # prefix is specified.
         if self._prefix is not None and len(self._prefix) != 0:
@@ -151,31 +151,17 @@ class NotificationSource(object):
         If we hit a transient error, the _Retriable exception will be raised.
         """
         tag = self._tag_form % (uuid, sequence)
-        # Serialize calls to basic_consume, because in case get() gets called
-        # concurrently we don't want two basic_consume calls in flight at the
-        # same time, since in case of a 404 failure txamqp would errback both
-        # calls and AMQP formally gives no hint about which queue the failure
-        # is for.
-        yield self._consume_lock.acquire()
         try:
-            yield _check_retriable(
+            yield self._check_retriable(
                 channel.basic_consume, consumer_tag=tag,
                 queue=self._queue_form % uuid)
         except ChannelClosed as error:
             # If the broker sent us channel-close because the queue doesn't
             # exists, raise NotFound. Otherwise just propagate.
             if error.args[0].reply_code == 404:
-                # Try to terminate the AMQP connection cleanly (by sending the
-                # 'close' message), but if we fail let's force a transport
-                # shutdown.
-                try:
-                    yield channel.client.close()
-                except:
-                    channel.client.abortConnection()
+                yield channel.client.close()
                 raise NotFound()
             raise
-        finally:
-            self._consume_lock.release()
 
         log.msg("Consuming from queue '%s'" % uuid)
 
@@ -191,7 +177,7 @@ class NotificationSource(object):
             # Let's retry after reconnection.
             raise _Retriable()
 
-        yield _check_retriable(channel.basic_cancel, consumer_tag=tag)
+        yield self._check_retriable(channel.basic_cancel, consumer_tag=tag)
 
         channel.client.queues.pop(tag, None)
 
@@ -204,38 +190,44 @@ class NotificationSource(object):
 
         returnValue(Notification(msg, channel))
 
+    @inlineCallbacks
+    def _check_retriable(self, method, **kwargs):
+        """Invoke the given channel method and check for transient errors.
+
+        @param method: A bound method of a txamqp.protocol.AMQChannel instance.
+        @param kwargs: The keyword arguments to pass to the method.
+        """
+        # Serialize calls to channel method, because in case get() gets called
+        # concurrently we don't want two calls in flight at the same time, as
+        # in case of a failure txamqp would errback both calls and there's no
+        # hit about which call actually failed.
+        channel = method.im_self
+        yield self._channel_lock.acquire()
+        try:
+            if channel.closed:
+                # The channel got closed, e.g. because another call to
+                # NotificationSource._do() hit an error. In this case we just
+                # want to retry.
+                raise _Retriable()
+            yield method(**kwargs)
+        except ConnectionClosed as error:
+            # 320 (conncetion-forced) and 541 (internal-error) are transient
+            # errors that can be retried, the most common being 320 which
+            # happens if the broker gets restarted.
+            # See also https://www.rabbitmq.com/amqp-0-9-1-reference.html.
+            message = error.args[0]
+            if message.reply_code in (320, 541):
+                raise _Retriable()
+            raise
+        except Closed as error:
+            reason = error.args[0]
+            if isinstance(reason, Failure):
+                if isinstance(reason.value, TransportClosed):
+                    raise _Retriable()
+            raise
+        finally:
+            self._channel_lock.release()
+
 
 class _Retriable(Exception):
     """Raised by _check_retriable in case of transient errors."""
-
-
-@inlineCallbacks
-def _check_retriable(method, **kwargs):
-    """Invoke the given channel method and check for transient errors.
-
-    @param method: A bound method of a txamqp.protocol.AMQChannel instance.
-    @param kwargs: The keyword arguments to pass to the method.
-    """
-    channel = method.im_self
-    if channel.closed:
-        # The channel got closed, e.g. because another call to
-        # NotificationSource._do() hit an error. In this case we just want
-        # to retry.
-        raise _Retriable()
-    try:
-        yield method(**kwargs)
-    except ConnectionClosed as error:
-        # 320 (conncetion-forced) and 541 (internal-error) are transient
-        # errors that can be retried, the most common being 320 which
-        # happens if the broker gets restarted.
-        # See also https://www.rabbitmq.com/amqp-0-9-1-reference.html.
-        message = error.args[0]
-        if message.reply_code in (320, 541):
-            raise _Retriable()
-        raise
-    except Closed as error:
-        reason = error.args[0]
-        if isinstance(reason, Failure):
-            if isinstance(reason.value, TransportClosed):
-                raise _Retriable()
-        raise
