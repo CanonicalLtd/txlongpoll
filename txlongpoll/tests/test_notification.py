@@ -217,6 +217,19 @@ class NotificationSourceTest(TestCase):
         channel.connection_close_ok()
         self.assertThat(deferred, fires_with_not_found())
 
+    def test_get_with_queue_not_found_unclean_close(self):
+        """
+        If when hitting 404 we fail to shutdown the AMQP connection cleanly
+        within 5 seconds, the client just forces a close.
+        """
+        client = yield self.connector()
+        deferred = self.source.get("uuid", 1)
+        channel = self.connector.transport.channel(1)
+        channel.channel_close(reply_code=404, reply_text="not found")
+        self.clock.advance(5)
+        self.assertThat(deferred, fires_with_not_found())
+        self.assertTrue(self.successResultOf(client.disconnected.wait()))
+
     def test_get_with_concurrent_consume_calls(self):
         """
         Calls to basic_consume get serialized, and in case of a 404 failure
@@ -228,6 +241,8 @@ class NotificationSourceTest(TestCase):
         # Make the first call fail with 404
         channel = self.connector.transport.channel(1)
         channel.channel_close(reply_code=404, reply_text="not found")
+        channel = self.connector.transport.channel(0)
+        channel.connection_close_ok()
         self.assertThat(deferred1, fires_with_not_found())
 
         # The second call will be retried

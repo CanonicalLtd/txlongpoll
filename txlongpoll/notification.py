@@ -159,7 +159,12 @@ class NotificationSource(object):
             # If the broker sent us channel-close because the queue doesn't
             # exists, raise NotFound. Otherwise just propagate.
             if error.args[0].reply_code == 404:
-                yield channel.client.close()
+                # This will try to close the client cleanly (by sending 'close'
+                # and waiting for 'close-ok'), but will force a connection
+                # shutdown if that doesn't happen within 5 seconds (e.g because
+                # the broker got shutdown exactly at this time).
+                # See AMQClient.close().
+                yield channel.client.close(within=5)
                 raise NotFound()
             raise
 
