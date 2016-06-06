@@ -16,7 +16,6 @@ from twisted.internet.defer import (
     inlineCallbacks,
     returnValue,
 )
-from twisted.internet.task import deferLater
 from twisted.internet.error import ConnectionDone
 from twisted.python import log
 from txamqp.client import Closed
@@ -136,8 +135,8 @@ class NotificationSource(object):
         except QueueClosed:
             # The queue has been closed, presumably because of a side effect.
             # Let's retry after reconnection.
-            notification = yield deferLater(
-                self._clock, 0, self.get, uuid, sequence)
+            yield channel.client.disconnected.wait()
+            notification = yield self.get(uuid, sequence)
             returnValue(notification)
         except Closed, e:
             channel.client.close(ConnectionDone())
