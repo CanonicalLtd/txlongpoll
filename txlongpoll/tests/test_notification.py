@@ -91,6 +91,7 @@ class NotificationConnectorTest(TestCase):
         channel.basic_qos_ok()
         self.service.client.close()
         deferred = self.connector()
+        channel = self.service.transport.channel(1)
         channel.channel_open_ok()
         channel.basic_qos_ok()
         self.assertThat(deferred, fires_with_channel(1))
@@ -155,20 +156,19 @@ class NotificationSourceTest(TestCase):
 
     def test_get_with_retry_loop_timeout(self):
         """
-        The retry loop gets interrupted it hits the configured timeout, and
+        The retry loop gets interrupted if hits the configured timeout, and
         a Timeout exceptionis raised.
         """
         deferred = self.source.get("uuid", 1)
 
-        # Let some time elapse and fail the first try.
+        # Let some time elapse and fail the first try simulating a broker
+        # shutdown.
         channel = self.connector.transport.channel(1)
         self.clock.advance(self.source.timeout / 2)
         channel.connection_close(reply_code=320)
-        self.clock.advance(0)
 
         # Let some more time elapse and fail the second try too (this time
         # with a queue timeout).
-        channel = self.connector.transport.channel(1)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         self.clock.advance(self.source.timeout / 2)
@@ -188,7 +188,6 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(1)
         self.clock.advance(self.source.timeout / 2)
         channel.connection_close(reply_code=320)
-        self.clock.advance(0)
 
         # Let some more time elapse and fail the second try too (this time
         # with a queue timeout).
@@ -225,7 +224,6 @@ class NotificationSourceTest(TestCase):
         """
         deferred = self.source.get("uuid", 1)
         self.connector.transport.loseConnection()
-        self.clock.advance(0)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
@@ -267,7 +265,6 @@ class NotificationSourceTest(TestCase):
 
         # Simulate the broken being stopped
         channel.connection_close(reply_code=320, reply_text="shutdown")
-        self.clock.advance(0)
 
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
@@ -277,8 +274,8 @@ class NotificationSourceTest(TestCase):
 
     def test_get_with_queue_not_found(self):
         """
-        If the queue we're consuming from gets closed for whatever reason
-        (for example the client got disconnected), we try again.
+        If we try to consume from a queue that doesn't exist, NotFound is
+        raised.
         """
         deferred = self.source.get("uuid", 1)
         channel = self.connector.transport.channel(1)
@@ -286,6 +283,19 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(0)
         channel.connection_close_ok()
         self.assertThat(deferred, fires_with_not_found())
+
+    def test_get_with_queue_not_found_unclean_close(self):
+        """
+        If when hitting 404 we fail to shutdown the AMQP connection cleanly
+        within 5 seconds, the client just forces a close.
+        """
+        client = yield self.connector()
+        deferred = self.source.get("uuid", 1)
+        channel = self.connector.transport.channel(1)
+        channel.channel_close(reply_code=404, reply_text="not found")
+        self.clock.advance(5)
+        self.assertThat(deferred, fires_with_not_found())
+        self.assertTrue(self.successResultOf(client.disconnected.wait()))
 
     def test_get_with_concurrent_consume_calls(self):
         """
@@ -303,7 +313,6 @@ class NotificationSourceTest(TestCase):
         self.assertThat(deferred1, fires_with_not_found())
 
         # The second call will be retried
-        self.clock.advance(0)
         self.assertEqual(2, self.connector.connections)
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid2.1")
