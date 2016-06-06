@@ -46,15 +46,14 @@ class Timeout(Exception):
 class Notification(object):
     """A single notification from a stream."""
 
-    def __init__(self, message, channel):
+    def __init__(self, source, message):
         """
+        @param source: The NotificationSource the message was received through.
         @param message: The raw txamqp.message.Message received from the
             underlying AMQP queue.
-        @param channel: The txamqp.protocol.Channel the message was received
-            through.
         """
+        self._source = source
         self._message = message
-        self._channel = channel
 
     @property
     def payload(self):
@@ -130,7 +129,7 @@ class NotificationSource(object):
             # Check for the messages arrived in the mean time
             if queue.pending:
                 msg = queue.pending.pop()
-                returnValue(Notification(msg, channel))
+                returnValue(Notification(self, msg))
             raise Timeout()
         except QueueClosed:
             # The queue has been closed, presumably because of a side effect.
@@ -152,4 +151,4 @@ class NotificationSource(object):
         yield channel.basic_cancel(consumer_tag=tag, nowait=True)
         channel.client.queues.pop(tag, None)
 
-        returnValue(Notification(msg, channel))
+        returnValue(Notification(self, msg))
