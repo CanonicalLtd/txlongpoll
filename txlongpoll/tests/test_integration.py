@@ -216,13 +216,13 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the restart has
         # destroyed it.
-        client = yield self.endpoint.connect(AMQFactory())
-        channel = yield client.channel(1)
-        yield channel.channel_open()
-        yield channel.queue_declare(queue="uuid")
+        self.client = yield self.endpoint.connect(AMQFactory())
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
 
         # Publish a message in the queue
-        yield channel.basic_publish(
+        yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
 
         notification = yield d
@@ -253,13 +253,13 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the crash has
         # destroyed it.
-        client = yield self.endpoint.connect(AMQFactory())
-        channel = yield client.channel(1)
-        yield channel.channel_open()
-        yield channel.queue_declare(queue="uuid")
+        self.client = yield self.endpoint.connect(AMQFactory())
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
 
         # Publish a message in the queue
-        yield channel.basic_publish(
+        yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
 
         notification = yield d
@@ -294,13 +294,13 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the restart has
         # destroyed it.
-        client = yield self.endpoint.connect(AMQFactory())
-        channel = yield client.channel(1)
-        yield channel.channel_open()
-        yield channel.queue_declare(queue="uuid")
+        self.client = yield self.endpoint.connect(AMQFactory())
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
 
         # Publish a message in the queue
-        yield channel.basic_publish(
+        yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
 
         notification = yield d
