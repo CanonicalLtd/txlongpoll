@@ -18,6 +18,7 @@ from twisted.internet.defer import (
     inlineCallbacks,
     returnValue,
 )
+from twisted.internet.task import deferLater
 from twisted.python import log
 from twisted.python.failure import Failure
 from txamqp.client import (
@@ -52,12 +53,14 @@ class Timeout(Exception):
 class NotificationConnector(object):
     """Provide ready-to-use AMQP channels."""
 
-    def __init__(self, service):
+    def __init__(self, service, clock=reactor):
         """
         @param service: An object implementing the same whenConnected() API as
             the twisted.application.internet.ClientService class.
+        @param clock: An object implementing IReactorTime.
         """
         self._service = service
+        self._clock = clock
         self._channel = None
         self._channel_lock = DeferredLock()
 
@@ -69,6 +72,15 @@ class NotificationConnector(object):
         # Serialize calls, in order to setup new channels only once.
         yield self._channel_lock.acquire()
         try:
+            if self._channel and self._channel.client.closed:
+                # If we have a client but it's closed, let's wait for it to be
+                # fully disconnected and spin a reactor iteration to give
+                # change to the AMQClient.connectionLost callback chain to
+                # settle (in particular our ClientService will be notified and
+                # will start connecting again).
+                yield self._channel.client.disconnected.wait()
+                yield deferLater(self._clock, 0, lambda: None)
+
             client = yield self._service.whenConnected()
             channel = yield client.channel(1)
             # Check if we got a new channel, and initialize it if so.
