@@ -3,7 +3,7 @@
 
 PYTHON = python
 # Whether to build offline, using a download-cache
-OFFLINE ?= 1
+OFFLINE ?= 0
 
 BOOTSTRAP_BIN := bootstrap.py
 BOOTSTRAP_FLAGS := --eggs=eggs --version=1.5.2

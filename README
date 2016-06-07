@@ -4,16 +4,17 @@ Generic long poll server used by Launchpad and Landscape.
 Dependencies
 ------------
 
-By default txlongpoll attempts to build without going to the network;
-instead it tries to find all dependencies from download-cache/dist,
+By default txlongpoll attempts to fetch resources from the internet.
+
+instead it tries 
 and you must download all the dependencies yourself.
 
-If you prefer to use resources from the 'net, PyPI for example, then
-prepend OFFLINE=0 to your make commands:
+If you prefer to find all dependencies from download-cache/dist, then
+prepend OFFLINE=1 to your make commands:
 
-- OFFLINE=0 make build
+- OFFLINE=1 make build
 
-- OFFLINE=0 make check
+- OFFLINE=1 make check
 
 
 Building
