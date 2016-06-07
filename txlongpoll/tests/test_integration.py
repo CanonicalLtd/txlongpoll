@@ -39,6 +39,7 @@ from txlongpoll.notification import (
 from txlongpoll.frontend import DeprecatedQueueManager
 from txlongpoll.testing.integration import (
     IntegrationTest,
+    ProxyService,
     AMQTest,
     QueueWrapper,
 )
@@ -51,7 +52,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         super(NotificationSourceIntegrationTest, self).setUp()
         self.endpoint = AMQEndpoint(
             reactor, self.rabbit.config.hostname, self.rabbit.config.port,
-            username="guest", password="guest")
+            username="guest", password="guest", heartbeat=1)
         self.policy = backoffPolicy(initialDelay=0)
         self.service = ClientService(
             self.endpoint, AMQFactory(), retryPolicy=self.policy)
@@ -73,9 +74,10 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         # may have been stopped (e.g. when this is the last test being run).
         try:
             yield self.channel.queue_delete(queue="uuid")
-            yield self.client.close()
         except:
             pass
+        finally:
+            yield self.client.close()
 
     @inlineCallbacks
     def test_get_after_publish(self):
@@ -275,6 +277,53 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         notification = yield d
         self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_wb_heartbeat(self):
+        """
+        If heartbeat checks fail due to network issues, we keep re-trying
+        until the network recovers.
+        """
+        self.service.stopService()
+
+        # Put a TCP proxy between NotificationSource and RabbitMQ, to simulate
+        # packets getting dropped on the floor.
+        proxy = ProxyService(
+            self.rabbit.config.hostname, self.rabbit.config.port)
+        proxy.startService()
+        self.addCleanup(proxy.stopService)
+        self.endpoint._port = proxy.port
+        self.service = ClientService(
+            self.endpoint, AMQFactory(), retryPolicy=self.policy)
+        self.connector._service = self.service
+        self.service.startService()
+
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        channel = yield self.connector()
+
+        deferred = self.source.get("uuid", 0)
+
+        # Start dropping packets on the floor
+        proxy.block()
+
+        # Publish a notification, which won't be delivered just yet.
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        # Wait for the first connection to terminate, because heartbeat
+        # checks will fail.
+        yield channel.client.disconnected.wait()
+
+        # Now let packets flow again.
+        proxy.unblock()
+
+        # The situation got recovered.
+        notification = yield deferred
+        self.assertEqual("hello", notification.payload)
+        self.assertEqual(2, proxy.connections)
 
     @inlineCallbacks
     def test_reject_notification(self):
