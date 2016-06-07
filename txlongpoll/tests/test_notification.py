@@ -13,16 +13,11 @@ from testtools.twistedsupport import (
     failed,
 )
 
-from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
 from twisted.logger import Logger
-from twisted.internet.address import IPv4Address
 
 from txamqp.factory import AMQFactory
-from txamqp.testing import AMQPump
-from txamqp.client import (
-    ConnectionClosed,
-)
+from txamqp.client import ConnectionClosed
 
 from txlongpoll.notification import (
     NotificationConnector,
@@ -30,24 +25,10 @@ from txlongpoll.notification import (
     Timeout,
     NotFound,
 )
-
-
-class FakeClientService(object):
-    """Implement a fake ClientService.whenConnected."""
-
-    def __init__(self, factory):
-        self.factory = factory
-        self.client = None  # Current client
-        self.transport = None  # Current transport
-        self.client = None
-
-    def whenConnected(self):
-        if self.client is None or self.client.closed:
-            address = IPv4Address("TCP", "127.0.0.1", 5672)
-            self.client = self.factory.buildProtocol(address)
-            self.transport = AMQPump()
-            self.transport.connect(self.client)
-        return succeed(self.client)
+from txlongpoll.testing.unit import (
+    FakeConnector,
+    FakeClientService,
+)
 
 
 class NotificationConnectorTest(TestCase):
@@ -96,28 +77,6 @@ class NotificationConnectorTest(TestCase):
         channel.channel_open_ok()
         channel.basic_qos_ok()
         self.assertThat(deferred, fires_with_channel(1))
-
-
-class FakeConnector(object):
-    """Return a client connected to a fake AMQPump transport."""
-
-    def __init__(self, factory, logger=None):
-        self.factory = factory
-        self.logger = logger
-        self.client = None  # Current client
-        self.transport = None  # Current transport
-        self.connections = 0  # Number of connections created
-
-    def __call__(self):
-        if self.client is None or self.client.closed:
-            address = IPv4Address("TCP", "127.0.0.1", 5672)
-            self.client = self.factory.buildProtocol(address)
-            self.transport = AMQPump(logger=self.logger)
-            self.transport.connect(self.client)
-            self.connections += 1
-
-        # AMQClient.channel() will fire synchronously here
-        return self.client.channel(1)
 
 
 class NotificationSourceTest(TestCase):
