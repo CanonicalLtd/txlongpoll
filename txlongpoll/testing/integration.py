@@ -21,7 +21,6 @@ from twisted.internet.defer import (
     inlineCallbacks,
     )
 from twisted.internet.endpoints import (
-    TCP4ServerEndpoint,
     TCP4ClientEndpoint,
 )
 from twisted.application.service import Service
@@ -223,7 +222,7 @@ class ProxyService(Service):
 class _FrontendProtocol(Protocol):
 
     def connectionMade(self):
-        self.factory.connections += 1#.append(self)
+        self.factory.connections += 1
         self.buffer = ""  # Pending writes
         self.backend = None  # Backend protocol
         factory = Factory()
