@@ -4,8 +4,9 @@
 """
 Async frontend server for serving answers from background processor.
 """
-
 import json
+
+from functools import partial
 
 from twisted.internet.defer import (
     Deferred,
@@ -136,9 +137,12 @@ class FrontEndAjax(Resource):
     """
     isLeaf = True
 
-    def __init__(self, message_queue):
+    def __init__(self, source):
+        """
+        @param source: The NotificationSource to fetch notifications from.
+        """
         Resource.__init__(self)
-        self.message_queue = message_queue
+        self.source = source
         self._finished = {}
 
     def render(self, request):
@@ -150,7 +154,7 @@ class FrontEndAjax(Resource):
         """
         if "uuid" not in request.args and "sequence" not in request.args:
             request.setHeader("Content-Type", "text/plain")
-            return "Async frontend for %s" % self.message_queue._prefix
+            return "Async frontend for %s" % self.source._prefix
 
         if "uuid" not in request.args or "sequence" not in request.args:
             request.setHeader("Content-Type", "text/plain")
@@ -164,67 +168,73 @@ class FrontEndAjax(Resource):
             request.setResponseCode(BAD_REQUEST)
             return "Invalid request"
 
-        request_id = "%s-%s" % (uuid, sequence)
+        request.notifyFinish().addBoth(lambda _: self._done(uuid, sequence))
 
-        def _finished(ignored):
-            if request_id in self._finished:
-                # If the request_id is already in finished, that means the
-                # request terminated properly. We remove it from finished to
-                # prevent from it growing indefinitely.
-                self._finished.pop(request_id)
-            else:
-                # Otherwise, put it in finished so that the message is not sent
-                # when write is called.
-                self._finished[request_id] = True
-                self.message_queue.cancel_get_message(uuid, sequence)
-
-        request.notifyFinish().addBoth(_finished)
-
-        d = self.message_queue.get_message(uuid, sequence)
-
-        def write(data):
-            result, tag = data
-            if self._finished.get(request_id):
-                self._finished.pop(request_id)
-                self.message_queue.reject_message(tag)
-                return
-
-            self.message_queue.ack_message(tag)
-
-            data = json.loads(result)
-
-            if data.pop("original-uuid", None) == uuid:
-                # Ignore the message for the page who emitted the job
-                d = self.message_queue.get_message(uuid, sequence)
-                d.addCallback(write)
-                d.addErrback(failed)
-                return
-
-            if "error" in data:
-                request.setResponseCode(BAD_REQUEST)
-
-            request.setHeader("Content-Type", "application/json")
-
-            request.write(result)
-            self._finished[request_id] = False
-            request.finish()
-
-        def failed(error):
-            if self._finished.get(request_id):
-                self._finished.pop(request_id)
-                return
-
-            if error.check(Timeout):
-                request.setResponseCode(REQUEST_TIMEOUT)
-            elif error.check(NotFound):
-                request.setResponseCode(NOT_FOUND)
-            else:
-                log.err(error, "Failed to get message")
-                request.setResponseCode(INTERNAL_SERVER_ERROR)
-                request.write(str(error.value))
-            self._finished[request_id] = False
-            request.finish()
-
-        d.addCallback(write)
-        d.addErrback(failed)
+        d = self.source.get_message(uuid, sequence)
+        d.addCallback(partial(self._succeed, request, uuid, sequence))
+        d.addErrback(partial(self._fail, request, uuid, sequence))
         return NOT_DONE_YET
+
+    def _succeed(self, request, uuid, sequence, data):
+        """Send a success notification to the client."""
+        request_id = self._request_id(uuid, sequence)
+        result, tag = data
+        if self._finished.get(request_id):
+            self._finished.pop(request_id)
+            self.source.reject_message(tag)
+            return
+
+        self.source.ack_message(tag)
+
+        data = json.loads(result)
+
+        if data.pop("original-uuid", None) == uuid:
+            # Ignore the message for the page who emitted the job
+            d = self.source.get_message(uuid, sequence)
+            d.addCallback(partial(self._succeed, request, uuid, sequence))
+            d.addErrback(partial(self._fail, request, uuid, sequence))
+            return
+
+        if "error" in data:
+            request.setResponseCode(BAD_REQUEST)
+
+        request.setHeader("Content-Type", "application/json")
+
+        request.write(result)
+        self._finished[request_id] = False
+        request.finish()
+
+    def _fail(self, request, uuid, sequence, error):
+        """Send an error to the client."""
+        request_id = self._request_id(uuid, sequence)
+        if self._finished.get(request_id):
+            self._finished.pop(request_id)
+            return
+
+        if error.check(Timeout):
+            request.setResponseCode(REQUEST_TIMEOUT)
+        elif error.check(NotFound):
+            request.setResponseCode(NOT_FOUND)
+        else:
+            log.err(error, "Failed to get message")
+            request.setResponseCode(INTERNAL_SERVER_ERROR)
+            request.write(str(error.value))
+        self._finished[request_id] = False
+        request.finish()
+
+    def _done(self, uuid, sequence):
+        """Complete the request, doing the necessary bookkeeping."""
+        request_id = self._request_id(uuid, sequence)
+        if request_id in self._finished:
+            # If the request_id is already in finished, that means the
+            # request terminated properly. We remove it from finished to
+            # prevent from it growing indefinitely.
+            self._finished.pop(request_id)
+        else:
+            # Otherwise, put it in finished so that the message is not sent
+            # when write is called.
+            self._finished[request_id] = True
+            self.source.cancel_get_message(uuid, sequence)
+
+    def _request_id(self, uuid, sequence):
+        return "%s-%s" % (uuid, sequence)
