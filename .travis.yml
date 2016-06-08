@@ -5,4 +5,9 @@ addons:
     packages:
     - python-subunit
     - rabbitmq-server
+services:
+  - rabbitmq
+install:
+    - sudo rabbitmq-plugins enable rabbitmq_management
+    - sudo service rabbitmq-server restart
 script: make check
