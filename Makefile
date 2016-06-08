@@ -34,10 +34,7 @@ build-update-paths:
 
 
 check: bin/testpy
-	bin/testpy -c "import sys; print sys.path"
-	python -c "import sys; print sys.path"
-	python -c "import subunit; print subunit.__file__"
-	#bin/testpy -m testtools.run -- discover
+	bin/testpy -m testtools.run -- discover
 
 
 dist: $(BUILDOUT_BIN)

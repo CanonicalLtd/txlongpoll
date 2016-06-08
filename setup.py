@@ -32,6 +32,6 @@ setup(
             'rabbitfixture',
             'testresources >= 0.2.4_r58',
             'testtools',
-            # 'subunit',  # Not easy-installable.
+            'python-subunit',
             ],
         ))
