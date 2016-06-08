@@ -2,17 +2,28 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 PYTHON = python
+# Whether to build offline, using a download-cache
+OFFLINE ?= 0
 
 BOOTSTRAP_BIN := bootstrap.py
-BOOTSTRAP = PYTHONPATH= $(PYTHON) $(BOOTSTRAP_BIN)
+BOOTSTRAP_FLAGS := --eggs=eggs --version=1.5.2
+ifeq "$(OFFLINE)" "1"
+BOOTSTRAP_FLAGS += \
+    --setup-source=download-cache/dist/ez_setup.py \
+    --download-base=download-cache/dist
+endif
+BOOTSTRAP = PYTHONPATH= $(PYTHON) $(BOOTSTRAP_BIN) $(BOOTSTRAP_FLAGS)
 
 BUILDOUT_BIN := bin/buildout
 BUILDOUT_CFG := buildout.cfg
-BUILDOUT = PYTHONPATH= $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
+BUILDOUT_FLAGS := -qc $(BUILDOUT_CFG)
+ifeq "$(OFFLINE)" "1"
+BUILDOUT_FLAGS += buildout:install-from-cache=true
+endif
+BUILDOUT = PYTHONPATH= $(BUILDOUT_BIN) $(BUILDOUT_FLAGS)
 
 
 default: check
-
 
 build: bin/twistd
 
@@ -47,10 +58,7 @@ eggs:
 
 
 $(BUILDOUT_BIN): download-cache eggs
-	$(BOOTSTRAP) \
-	    --setup-source=download-cache/dist/ez_setup.py \
-	    --download-base=download-cache/dist \
-	    --eggs=eggs --version=1.5.2
+	$(BOOTSTRAP)
 	touch --no-create $@
 
 
