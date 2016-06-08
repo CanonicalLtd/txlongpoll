@@ -18,6 +18,7 @@ from twisted.logger import Logger
 
 from txamqp.factory import AMQFactory
 
+from txlongpoll.client import AMQP0_8_SPEC_PATH
 from txlongpoll.notification import (
     NotificationSource,
     Timeout,
@@ -33,7 +34,7 @@ class NotificationSourceTest(TestCase):
         self.useFixture(CaptureTwistedLogs())
         self.logger = Logger()
         self.clock = Clock()
-        self.factory = AMQFactory(clock=self.clock)
+        self.factory = AMQFactory(clock=self.clock, spec=AMQP0_8_SPEC_PATH)
         self.connector = FakeConnector(self.factory, logger=self.logger)
         self.source = NotificationSource(self.connector, clock=self.clock)
 
