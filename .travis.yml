@@ -1,13 +1,5 @@
 sudo: required
 dist: trusty
-addons:
-  apt:
-    packages:
-    - python-subunit
-    - rabbitmq-server
-services:
-  - rabbitmq
 install:
     - sudo rabbitmq-plugins disable rabbitmq_management
-    - sudo service rabbitmq-server stop
 script: make check

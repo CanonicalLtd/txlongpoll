@@ -47,6 +47,18 @@ support, so you can also do the following:
 This is probably the best way to develop txlongpoll.
 
 
+Continous Integration
+---------------------
+
+The lp:txlongpoll branch is mirrored on GitHub using a Launchpad webhook:
+
+https://github.com/CanonicalLtd/txlongpoll
+
+Travis builds will be triggered at each commit:
+
+https://travis-ci.org/CanonicalLtd/txlongpoll/builds
+
+
 Running
 -------
 
