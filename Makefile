@@ -34,7 +34,7 @@ build-update-paths:
 
 
 check: bin/testpy
-	bin/testpy -m subunit/run -- discover
+	bin/testpy -m testtools.run -- discover
 
 
 dist: $(BUILDOUT_BIN)
