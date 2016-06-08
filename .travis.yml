@@ -8,6 +8,6 @@ addons:
 services:
   - rabbitmq
 install:
-    - sudo rabbitmq-plugins enable rabbitmq_management
-    - sudo service rabbitmq-server restart
+    - sudo rabbitmq-plugins disable rabbitmq_management
+    - sudo service rabbitmq-server stop
 script: make check
