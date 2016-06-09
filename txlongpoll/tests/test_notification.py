@@ -1,4 +1,4 @@
-# Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
+# Copyright 2005-2016 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from testtools import TestCase
@@ -82,7 +82,7 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
 
-        # Simulate the broken being stopped
+        # Simulate the broker being stopped
         channel.connection_close(reply_code=320, reply_text="shutdown")
 
         channel = self.connector.transport.channel(1)
