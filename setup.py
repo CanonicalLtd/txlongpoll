@@ -24,7 +24,7 @@ setup(
         'oops_twisted >= 0.0.3',
         'pyyaml',
         'Twisted',
-        'txAMQP >= 0.5',
+        'txAMQP >= 0.7',
         'zope.interface',
         ],
     extras_require=dict(
