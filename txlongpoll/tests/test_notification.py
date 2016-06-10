@@ -1,4 +1,4 @@
-# Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
+# Copyright 2005-2016 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from testtools import TestCase
@@ -19,6 +19,7 @@ from twisted.logger import Logger
 from txamqp.factory import AMQFactory
 from txamqp.client import ConnectionClosed
 
+from txlongpoll.client import AMQP0_8_SPEC_PATH
 from txlongpoll.notification import (
     NotificationConnector,
     NotificationSource,
@@ -86,7 +87,7 @@ class NotificationSourceTest(TestCase):
         self.useFixture(CaptureTwistedLogs())
         self.logger = Logger()
         self.clock = Clock()
-        self.factory = AMQFactory(clock=self.clock)
+        self.factory = AMQFactory(clock=self.clock, spec=AMQP0_8_SPEC_PATH)
         self.connector = FakeConnector(self.factory, logger=self.logger)
         self.source = NotificationSource(self.connector, clock=self.clock)
 
@@ -117,7 +118,7 @@ class NotificationSourceTest(TestCase):
     def test_get_with_retry_loop_timeout(self):
         """
         The retry loop gets interrupted if hits the configured timeout, and
-        a Timeout exceptionis raised.
+        a Timeout exception is raised.
         """
         deferred = self.source.get("uuid", 1)
 
@@ -134,7 +135,7 @@ class NotificationSourceTest(TestCase):
         self.clock.advance(self.source.timeout / 2)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
 
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_timeout())
 
     def test_get_with_retry_after_connection_lost(self):
@@ -157,7 +158,7 @@ class NotificationSourceTest(TestCase):
         self.clock.advance(self.source.timeout / 2)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
 
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_timeout())
 
     def test_get_with_heartbeat_check_failure(self):
@@ -174,7 +175,7 @@ class NotificationSourceTest(TestCase):
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_payload("foo"))
 
     def test_get_with_transport_error(self):
@@ -188,7 +189,7 @@ class NotificationSourceTest(TestCase):
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_payload("foo"))
 
     def test_get_with_connection_closed_unexpected(self):
@@ -223,7 +224,7 @@ class NotificationSourceTest(TestCase):
         channel = self.connector.transport.channel(1)
         channel.basic_consume_ok(consumer_tag="uuid1.1")
 
-        # Simulate the broken being stopped
+        # Simulate the broker being stopped
         channel.connection_close(reply_code=320, reply_text="shutdown")
 
         channel = self.connector.transport.channel(1)

@@ -1,5 +1,6 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
+import sys
 
 from rabbitfixture.server import RabbitServer
 from testresources import (
@@ -7,6 +8,8 @@ from testresources import (
     ResourcedTestCase,
     )
 from testtools import TestCase
+from testtools.content import Content
+from testtools.content_type import UTF8_TEXT
 from testtools.deferredruntest import (
     AsynchronousDeferredRunTestForBrokenTwisted,
     )
@@ -37,6 +40,18 @@ class QueueWrapper(object):
 
 
 class RabbitServerWithoutReset(RabbitServer):
+
+    def setUp(self):
+        # Print RabbitMQ log on errors. Useful for debugging Travis failures.
+        try:
+            super(RabbitServerWithoutReset, self).setUp()
+        except Exception as error:
+            message = str(error)
+            if message.startswith("Timeout waiting for RabbitMQ server"):
+                content = Content(UTF8_TEXT,
+                    lambda: open(self.config.logfile, "r").readlines())
+                print content.as_text()
+                raise error
 
     def reset(self):
         """No-op reset.
