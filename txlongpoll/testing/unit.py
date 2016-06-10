@@ -16,6 +16,7 @@ class FakeConnector(object):
         self.logger = logger
         self.client = None  # Current client
         self.transport = None  # Current transport
+        self.connections = 0  # Number of connections created
 
     def __call__(self):
         if self.client is None or self.client.closed:
@@ -23,6 +24,7 @@ class FakeConnector(object):
             self.client = self.factory.buildProtocol(address)
             self.transport = AMQPump(logger=self.logger)
             self.transport.connect(self.client)
+            self.connections += 1
 
         # AMQClient.channel() will fire synchronously here
         return self.client.channel(1)

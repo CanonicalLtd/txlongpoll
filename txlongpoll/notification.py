@@ -12,13 +12,19 @@ See also txlongpoll.frontend.FrontEndAjax.
 """
 
 from twisted.internet import reactor
+from twisted.internet.error import ConnectionClosed as TransportClosed
 from twisted.internet.defer import (
+    DeferredLock,
     inlineCallbacks,
     returnValue,
 )
-from twisted.internet.error import ConnectionDone
 from twisted.python import log
-from txamqp.client import Closed
+from twisted.python.failure import Failure
+from txamqp.client import (
+    Closed,
+    ConnectionClosed,
+    ChannelClosed,
+)
 from txamqp.queue import (
     Closed as QueueClosed,
     Empty,
@@ -87,7 +93,7 @@ class NotificationSource(object):
         self._connector = connector
         self._prefix = prefix
         self._clock = clock
-        self._pending_requests = []
+        self._channel_lock = DeferredLock()
         # Preserve compatibility by using special forms for naming when a
         # prefix is specified.
         if self._prefix is not None and len(self._prefix) != 0:
@@ -112,43 +118,111 @@ class NotificationSource(object):
         If no notification is received within the number of seconds in
         L{timeout}, then the returned Deferred will errback with L{Timeout}.
         """
-        channel = yield self._connector()
+        # Attempt to a fetch a single notification retrying any transient error
+        # until the timeout expires.
+        timeout = self.timeout
+        while timeout > 0:
+            now = self._clock.seconds()
+            channel = yield self._connector()
+            try:
+                notification = yield self._do(channel, uuid, sequence, timeout)
+                returnValue(notification)
+            except _Retriable:
+                # Wait for the connection to shutdown.
+                yield channel.client.disconnected.wait()
+                timeout -= self._clock.seconds() - now
+                continue
+        raise Timeout()
+
+    @inlineCallbacks
+    def _do(self, channel, uuid, sequence, timeout):
+        """Do fetch a single notification.
+
+        If we hit a transient error, the _Retriable exception will be raised.
+        """
         tag = self._tag_form % (uuid, sequence)
         try:
-            yield channel.basic_consume(
-                consumer_tag=tag, queue=(self._queue_form % uuid))
+            yield self._check_retriable(
+                channel.basic_consume, consumer_tag=tag,
+                queue=self._queue_form % uuid)
+        except ChannelClosed as error:
+            # If the broker sent us channel-close because the queue doesn't
+            # exists, raise NotFound. Otherwise just propagate.
+            if error.args[0].reply_code == 404:
+                # This will try to close the client cleanly (by sending 'close'
+                # and waiting for 'close-ok'), but will force a connection
+                # shutdown if that doesn't happen within 5 seconds (e.g because
+                # the broker got shutdown exactly at this time).
+                # See AMQClient.close().
+                yield channel.client.close(within=5)
+                raise NotFound()
+            raise
 
-            log.msg("Consuming from queue '%s'" % uuid)
+        log.msg("Consuming from queue '%s'" % uuid)
 
-            queue = yield channel.client.queue(tag)
-            msg = yield queue.get(self.timeout)
+        queue = yield channel.client.queue(tag)
+        empty = False
+
+        try:
+            msg = yield queue.get(timeout)
         except Empty:
-            # Let's wait for the cancel here
-            yield channel.basic_cancel(consumer_tag=tag)
-            channel.client.queues.pop(tag, None)
-            # Check for the messages arrived in the mean time
-            if queue.pending:
-                msg = queue.pending.pop()
-                returnValue(Notification(self, msg))
-            raise Timeout()
+            empty = True
         except QueueClosed:
             # The queue has been closed, presumably because of a side effect.
             # Let's retry after reconnection.
-            yield channel.client.disconnected.wait()
-            notification = yield self.get(uuid, sequence)
-            returnValue(notification)
-        except Closed, e:
-            channel.client.close(ConnectionDone())
-            if e.args and e.args[0].reply_code == 404:
-                raise NotFound()
-            else:
-                raise
-        except:
-            if channel.client and channel.client.transport:
-                channel.client.transport.loseConnection()
-            raise
+            raise _Retriable()
 
-        yield channel.basic_cancel(consumer_tag=tag, nowait=True)
+        yield self._check_retriable(channel.basic_cancel, consumer_tag=tag)
+
         channel.client.queues.pop(tag, None)
 
+        if empty:
+            # Check for the messages arrived in the mean time
+            if queue.pending:
+                msg = queue.pending.pop()
+            else:
+                raise Timeout()
+
         returnValue(Notification(self, msg))
+
+    @inlineCallbacks
+    def _check_retriable(self, method, **kwargs):
+        """Invoke the given channel method and check for transient errors.
+
+        @param method: A bound method of a txamqp.protocol.AMQChannel instance.
+        @param kwargs: The keyword arguments to pass to the method.
+        """
+        # Serialize calls to channel method, because in case get() gets called
+        # concurrently we don't want two calls in flight at the same time, as
+        # in case of a failure txamqp would errback both calls and there's no
+        # hit about which call actually failed.
+        channel = method.im_self
+        yield self._channel_lock.acquire()
+        try:
+            if channel.closed:
+                # The channel got closed, e.g. because another call to
+                # NotificationSource._do() hit an error. In this case we just
+                # want to retry.
+                raise _Retriable()
+            yield method(**kwargs)
+        except ConnectionClosed as error:
+            # 320 (conncetion-forced) and 541 (internal-error) are transient
+            # errors that can be retried, the most common being 320 which
+            # happens if the broker gets restarted.
+            # See also https://www.rabbitmq.com/amqp-0-9-1-reference.html.
+            message = error.args[0]
+            if message.reply_code in (320, 541):
+                raise _Retriable()
+            raise
+        except Closed as error:
+            reason = error.args[0]
+            if isinstance(reason, Failure):
+                if isinstance(reason.value, TransportClosed):
+                    raise _Retriable()
+            raise
+        finally:
+            self._channel_lock.release()
+
+
+class _Retriable(Exception):
+    """Raised by _check_retriable in case of transient errors."""
