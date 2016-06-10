@@ -65,7 +65,7 @@ class NotificationSourceTest(TestCase):
     def test_get_with_retry_loop_timeout(self):
         """
         The retry loop gets interrupted if hits the configured timeout, and
-        a Timeout exceptionis raised.
+        a Timeout exception is raised.
         """
         deferred = self.source.get("uuid", 1)
 
@@ -82,7 +82,7 @@ class NotificationSourceTest(TestCase):
         self.clock.advance(self.source.timeout / 2)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
 
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_timeout())
 
     def test_get_with_retry_after_connection_lost(self):
@@ -105,7 +105,7 @@ class NotificationSourceTest(TestCase):
         self.clock.advance(self.source.timeout / 2)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
 
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_timeout())
 
     def test_get_with_heartbeat_check_failure(self):
@@ -122,7 +122,7 @@ class NotificationSourceTest(TestCase):
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_payload("foo"))
 
     def test_get_with_transport_error(self):
@@ -136,7 +136,7 @@ class NotificationSourceTest(TestCase):
         channel.basic_consume_ok(consumer_tag="uuid1.1")
         channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid1.1")
-        self.assertEquals(2, self.connector.connections)
+        self.assertEqual(2, self.connector.connections)
         self.assertThat(deferred, fires_with_payload("foo"))
 
     def test_get_with_connection_closed_unexpected(self):
