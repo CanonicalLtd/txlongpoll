@@ -37,7 +37,7 @@ class NotificationConnectorTest(TestCase):
     def setUp(self):
         super(NotificationConnectorTest, self).setUp()
         self.clock = Clock()
-        self.factory = AMQFactory(clock=self.clock)
+        self.factory = AMQFactory(spec=AMQP0_8_SPEC_PATH, clock=self.clock)
         self.service = FakeClientService(self.factory)
         self.connector = NotificationConnector(self.service, clock=self.clock)
 
