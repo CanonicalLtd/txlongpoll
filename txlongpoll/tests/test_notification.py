@@ -21,11 +21,63 @@ from txamqp.client import ConnectionClosed
 
 from txlongpoll.client import AMQP0_8_SPEC_PATH
 from txlongpoll.notification import (
+    NotificationConnector,
     NotificationSource,
     Timeout,
     NotFound,
 )
-from txlongpoll.testing.unit import FakeConnector
+from txlongpoll.testing.unit import (
+    FakeConnector,
+    FakeClientService,
+)
+
+
+class NotificationConnectorTest(TestCase):
+
+    def setUp(self):
+        super(NotificationConnectorTest, self).setUp()
+        self.clock = Clock()
+        self.factory = AMQFactory(spec=AMQP0_8_SPEC_PATH, clock=self.clock)
+        self.service = FakeClientService(self.factory)
+        self.connector = NotificationConnector(self.service, clock=self.clock)
+
+    def test_fresh_channel(self):
+        """
+        Getting a channel for the first time makes the connector open it and
+        set the QOS.
+        """
+        deferred = self.connector()
+        channel = self.service.transport.channel(1)
+        channel.channel_open_ok()
+        channel.basic_qos_ok()
+        self.assertThat(deferred, fires_with_channel(1))
+
+    def test_reuse_channel(self):
+        """
+        Getting a channel for the second time avoids setting it up.
+        """
+        self.connector()
+        channel = self.service.transport.channel(1)
+        channel.channel_open_ok()
+        channel.basic_qos_ok()
+        deferred = self.connector()
+        self.assertThat(deferred, fires_with_channel(1))
+
+    def test_closed_client(self):
+        """
+        If the client got closed, a new channel is always created and setup.
+        """
+        self.connector()
+        channel = self.service.transport.channel(1)
+        channel.channel_open_ok()
+        channel.basic_qos_ok()
+        self.service.client.close()
+        deferred = self.connector()
+        self.clock.advance(0)
+        channel = self.service.transport.channel(1)
+        channel.channel_open_ok()
+        channel.basic_qos_ok()
+        self.assertThat(deferred, fires_with_channel(1))
 
 
 class NotificationSourceTest(TestCase):
@@ -228,6 +280,13 @@ class NotificationSourceTest(TestCase):
         channel.deliver("foo", consumer_tag='uuid2.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid2.1")
         self.assertThat(deferred2, fires_with_payload("foo"))
+
+
+def fires_with_channel(id):
+    """Assert that a connector fires with the given channel ID."""
+    return succeeded(
+         AfterPreprocessing(
+             lambda channel: channel.id, Equals(id)))
 
 
 def fires_with_payload(payload):
