@@ -197,8 +197,6 @@ class ProxyService(Service):
     def stopService(self):
         super(ProxyService, self).startService()
         self._listener.stopListening()
-        #for protocol in self._factory.connections:
-        #    protocol.loseConnection()
 
     def block(self):
         """Drop all packets on the floor."""
