@@ -18,7 +18,11 @@ class UnitTest(ResourcedTestCase, TestCase):
     """Base class for txlongpoll's tests, with some tweaks on testtools."""
 
     def assertRaises(self, exception, f=None, *args, **kw):
-        return unittest.TestCase.assertRaises(self, exception, f, *args, **kw)
+        # Override testtools' assertRaises so we get context managers behavior.
+        if f:
+            unittest.TestCase.assertRaises(self, exception, f, *args, **kw)
+        else:
+            return unittest.TestCase.assertRaises(self, exception)
 
 
 class FakeConnector(object):
