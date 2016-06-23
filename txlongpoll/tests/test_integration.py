@@ -82,7 +82,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
     def test_get_after_publish(self):
         """
         Calling get() after a message has been published in the associated
-        queue, returns a Notification for that message.
+        queue returns a Notification for that message.
         """
         yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
@@ -93,9 +93,10 @@ class NotificationSourceIntegrationTest(IntegrationTest):
     def test_get_before_publish(self):
         """
         Calling get() before a message has been published in the associated
-        queue, will wait until publication.
+        queue will wait until publication.
         """
         deferred = self.source.get("uuid", 0)
+        self.assertFalse(deferred.called)
         yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
         notification = yield deferred
@@ -109,12 +110,8 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         """
         yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
-        try:
+        with self.assertRaises(NotFound):
             yield self.source.get("uuid-unknown", 0)
-        except NotFound:
-            pass
-        else:
-            self.fail("NotFound wasn't raised")
         notification = yield self.source.get("uuid", 0)
         self.assertEqual("hello", notification.payload)
 
@@ -127,18 +124,14 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         client1 = yield self.service.whenConnected()
         deferred = self.source.get("uuid", 0)
 
-        try:
+        with self.assertRaises(NotFound):
             yield self.source.get("uuid-unknown", 0)
-        except NotFound:
-            pass
-        else:
-            self.fail("NotFound wasn't raised")
 
         yield self.channel.basic_publish(
             routing_key="uuid", content=Content("hello"))
 
         notification = yield deferred
-        self.assertEquals("hello", notification.payload)
+        self.assertEqual("hello", notification.payload)
         client2 = yield self.service.whenConnected()
         # The ClientService has reconnected, yielding a new client.
         self.assertIsNot(client1, client2)
@@ -150,12 +143,8 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         arrived on the queue.
         """
         self.source.timeout = 1
-        try:
+        with self.assertRaises(Timeout):
             yield self.source.get("uuid", 0)
-        except Timeout:
-            pass
-        else:
-            self.fail("Timeout not raised")
         client = yield self.service.whenConnected()
         channel = yield client.channel(1)
         # The channel is still opened
@@ -363,7 +352,7 @@ class DeprecatedQueueManagerTest(AMQTest):
             routing_key=self.queue_prefix + "uuid1",
             content=content)
         message = yield self.manager.get_message("uuid1", "0")
-        self.assertEquals(message[0], "some content")
+        self.assertEqual(message[0], "some content")
 
         self.assertNotIn(self.tag_prefix + "uuid1.0", self.client.queues)
 
@@ -384,7 +373,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         message, tag = yield self.manager.get_message("uuid1", "0")
         yield self.manager.reject_message(tag)
         message2, tag2 = yield self.manager.get_message("uuid1", "1")
-        self.assertEquals(message2, "some content")
+        self.assertEqual(message2, "some content")
 
     @inlineCallbacks
     def test_ack_message(self):
