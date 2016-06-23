@@ -24,7 +24,7 @@ setup(
         'oops_twisted >= 0.0.3',
         'pyyaml',
         'Twisted',
-        'txAMQP >= 0.5',
+        'txAMQP >= 0.7',
         'zope.interface',
         ],
     extras_require=dict(
@@ -32,6 +32,6 @@ setup(
             'rabbitfixture',
             'testresources >= 0.2.4_r58',
             'testtools',
-            # 'subunit',  # Not easy-installable.
+            'python-subunit',
             ],
         ))
