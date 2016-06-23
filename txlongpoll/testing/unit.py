@@ -3,10 +3,22 @@
 
 """Utilities for unit-testing of txlongpoll code."""
 
+import unittest
+
+from testtools import TestCase
+from testresources import ResourcedTestCase
+
 from twisted.internet.address import IPv4Address
 from twisted.internet.defer import succeed
 
 from txamqp.testing import AMQPump
+
+
+class UnitTest(ResourcedTestCase, TestCase):
+    """Base class for txlongpoll's tests, with some tweaks on testtools."""
+
+    def assertRaises(self, exception, f=None, *args, **kw):
+        return unittest.TestCase.assertRaises(self, exception, f, *args, **kw)
 
 
 class FakeConnector(object):

@@ -3,6 +3,8 @@
 
 """Integration tests running a real RabbitMQ broker."""
 
+from rabbitfixture.server import RabbitServerResources
+
 from twisted.internet import reactor
 from twisted.internet.defer import (
     inlineCallbacks,
@@ -12,24 +14,306 @@ from twisted.internet.task import (
     Clock,
     deferLater,
     )
+from twisted.application.internet import (
+    backoffPolicy,
+    ClientService,
+)
 
 from txamqp.content import Content
 from txamqp.protocol import (
     AMQChannel,
     AMQClient,
 )
+from txamqp.factory import AMQFactory
+from txamqp.endpoint import AMQEndpoint
 
 from testtools.deferredruntest import assert_fails_with
 
 from txlongpoll.notification import (
+    NotificationConnector,
+    NotificationSource,
     NotFound,
     Timeout,
 )
+from txlongpoll.client import AMQP0_8_SPEC_PATH
 from txlongpoll.frontend import DeprecatedQueueManager
-from txlongpoll.testing.client import (
+from txlongpoll.testing.integration import (
+    IntegrationTest,
+    ProxyService,
     AMQTest,
     QueueWrapper,
 )
+
+
+class NotificationSourceIntegrationTest(IntegrationTest):
+
+    @inlineCallbacks
+    def setUp(self):
+        super(NotificationSourceIntegrationTest, self).setUp()
+        self.endpoint = AMQEndpoint(
+            reactor, self.rabbit.config.hostname, self.rabbit.config.port,
+            username="guest", password="guest", heartbeat=1)
+        self.policy = backoffPolicy(initialDelay=0)
+        self.factory = AMQFactory(spec=AMQP0_8_SPEC_PATH)
+        self.service = ClientService(
+            self.endpoint, self.factory, retryPolicy=self.policy)
+        self.connector = NotificationConnector(self.service)
+        self.source = NotificationSource(self.connector)
+
+        self.client = yield self.endpoint.connect(self.factory)
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
+
+        self.service.startService()
+
+    @inlineCallbacks
+    def tearDown(self):
+        self.service.stopService()
+        super(NotificationSourceIntegrationTest, self).tearDown()
+        # Wrap resetting queues and client in a try/except, since the broker
+        # may have been stopped (e.g. when this is the last test being run).
+        try:
+            yield self.channel.queue_delete(queue="uuid")
+        except:
+            pass
+        finally:
+            yield self.client.close()
+
+    @inlineCallbacks
+    def test_get_after_publish(self):
+        """
+        Calling get() after a message has been published in the associated
+        queue returns a Notification for that message.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield self.source.get("uuid", 0)
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_before_publish(self):
+        """
+        Calling get() before a message has been published in the associated
+        queue will wait until publication.
+        """
+        deferred = self.source.get("uuid", 0)
+        self.assertFalse(deferred.called)
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        notification = yield deferred
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_with_error(self):
+        """
+        If an error occurs in during get(), the client is closed so
+        we can query messages again.
+        """
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+        with self.assertRaises(NotFound):
+            yield self.source.get("uuid-unknown", 0)
+        notification = yield self.source.get("uuid", 0)
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_concurrent_with_error(self):
+        """
+        If an error occurs in a call to get(), other calls don't
+        fail, and are retried on reconnection instead.
+        """
+        client1 = yield self.service.whenConnected()
+        deferred = self.source.get("uuid", 0)
+
+        with self.assertRaises(NotFound):
+            yield self.source.get("uuid-unknown", 0)
+
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield deferred
+        self.assertEqual("hello", notification.payload)
+        client2 = yield self.service.whenConnected()
+        # The ClientService has reconnected, yielding a new client.
+        self.assertIsNot(client1, client2)
+
+    @inlineCallbacks
+    def test_get_timeout(self):
+        """
+        Calls to get() timeout after a certain amount of time if no message
+        arrived on the queue.
+        """
+        self.source.timeout = 1
+        with self.assertRaises(Timeout):
+            yield self.source.get("uuid", 0)
+        client = yield self.service.whenConnected()
+        channel = yield client.channel(1)
+        # The channel is still opened
+        self.assertFalse(channel.closed)
+        # The consumer has been deleted
+        self.assertNotIn("uuid.0", client.queues)
+
+    @inlineCallbacks
+    def test_get_with_broker_shutdown_during_consume(self):
+        """
+        If rabbitmq gets shutdown during the basic-consume call, we wait
+        for the reconection and retry transparently.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Restart rabbitmq
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the restart has
+        # destroyed it.
+        self.client = yield self.endpoint.connect(self.factory)
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_get_with_broker_die_during_consume(self):
+        """
+        If rabbitmq dies during the basic-consume call, we wait for the
+        reconection and retry transparently.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Kill rabbitmq and start it again
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.runner.kill()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the crash has
+        # destroyed it.
+        self.client = yield self.endpoint.connect(self.factory)
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_wb_get_with_broker_shutdown_during_message_wait(self):
+        """
+        If rabbitmq gets shutdown while we wait for messages, we transparently
+        wait for the reconnection and try again.
+        """
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        yield self.connector()
+
+        d = self.source.get("uuid", 0)
+
+        # Acquiring the channel lock makes sure that basic-consume has
+        # succeeded and we started waiting for the message.
+        yield self.source._channel_lock.acquire()
+        self.source._channel_lock.release()
+
+        # Restart rabbitmq
+        yield self.client.close()
+        yield self.client.disconnected.wait()
+        self.rabbit.cleanUp()
+        self.rabbit.config = RabbitServerResources(
+            port=self.rabbit.config.port)  # Ensure that we use the same port
+        self.rabbit.setUp()
+
+        # Get a new channel and re-declare the queue, since the restart has
+        # destroyed it.
+        self.client = yield self.endpoint.connect(self.factory)
+        self.channel = yield self.client.channel(1)
+        yield self.channel.channel_open()
+        yield self.channel.queue_declare(queue="uuid")
+
+        # Publish a message in the queue
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        notification = yield d
+        self.assertEqual("hello", notification.payload)
+
+    @inlineCallbacks
+    def test_wb_heartbeat(self):
+        """
+        If heartbeat checks fail due to network issues, we keep re-trying
+        until the network recovers.
+        """
+        self.service.stopService()
+
+        # Put a TCP proxy between NotificationSource and RabbitMQ, to simulate
+        # packets getting dropped on the floor.
+        proxy = ProxyService(
+            self.rabbit.config.hostname, self.rabbit.config.port)
+        proxy.startService()
+        self.addCleanup(proxy.stopService)
+        self.endpoint._port = proxy.port
+        self.service = ClientService(
+            self.endpoint, self.factory, retryPolicy=self.policy)
+        self.connector._service = self.service
+        self.service.startService()
+
+        # This will make the connector setup the channel before we call
+        # get(), so by the time we call it in the next line all
+        # connector-related deferreds will fire synchronously and the
+        # code will block on basic-consume.
+        channel = yield self.connector()
+
+        deferred = self.source.get("uuid", 0)
+
+        # Start dropping packets on the floor
+        proxy.block()
+
+        # Publish a notification, which won't be delivered just yet.
+        yield self.channel.basic_publish(
+            routing_key="uuid", content=Content("hello"))
+
+        # Wait for the first connection to terminate, because heartbeat
+        # checks will fail.
+        yield channel.client.disconnected.wait()
+
+        # Now let packets flow again.
+        proxy.unblock()
+
+        # The situation got recovered.
+        notification = yield deferred
+        self.assertEqual("hello", notification.payload)
+        self.assertEqual(2, proxy.connections)
 
 
 class DeprecatedQueueManagerTest(AMQTest):
@@ -70,7 +354,7 @@ class DeprecatedQueueManagerTest(AMQTest):
             routing_key=self.queue_prefix + "uuid1",
             content=content)
         message = yield self.manager.get_message("uuid1", "0")
-        self.assertEquals(message[0], "some content")
+        self.assertEqual(message[0], "some content")
 
         self.assertNotIn(self.tag_prefix + "uuid1.0", self.client.queues)
 
@@ -91,7 +375,7 @@ class DeprecatedQueueManagerTest(AMQTest):
         message, tag = yield self.manager.get_message("uuid1", "0")
         yield self.manager.reject_message(tag)
         message2, tag2 = yield self.manager.get_message("uuid1", "1")
-        self.assertEquals(message2, "some content")
+        self.assertEqual(message2, "some content")
 
     @inlineCallbacks
     def test_ack_message(self):

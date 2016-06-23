@@ -1,6 +1,5 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
-import sys
 
 from rabbitfixture.server import RabbitServer
 from testresources import (
@@ -14,13 +13,22 @@ from testtools.deferredruntest import (
     AsynchronousDeferredRunTestForBrokenTwisted,
     )
 from twisted.internet import reactor
+from twisted.internet.protocol import (
+    Protocol,
+    Factory,
+)
 from twisted.internet.defer import (
     Deferred,
     DeferredQueue,
     inlineCallbacks,
     )
+from twisted.internet.endpoints import (
+    TCP4ClientEndpoint,
+)
+from twisted.application.service import Service
 from txamqp.client import Closed
 from txlongpoll.client import AMQFactory
+from txlongpoll.testing.unit import UnitTest
 
 
 class QueueWrapper(object):
@@ -61,12 +69,15 @@ class RabbitServerWithoutReset(RabbitServer):
         """
 
 
-class AMQTest(ResourcedTestCase, TestCase):
+class IntegrationTest(UnitTest):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
-        timeout=5)
+        timeout=10)
 
     resources = [('rabbit', FixtureResource(RabbitServerWithoutReset()))]
+
+
+class AMQTest(IntegrationTest):
 
     VHOST = "/"
     USER = "guest"
@@ -172,3 +183,87 @@ class AMQTest(ResourcedTestCase, TestCase):
         """
         self.exchanges.add(exchange)
         return self.real_exchange_declare(exchange=exchange, **kwargs)
+
+
+class ProxyService(Service):
+    """A TCP proxy that can be instructed to drop packets on the floor."""
+
+    def __init__(self, host, port):
+        """
+        @param host: The backend host to proxy.
+        @param port: The port on the backend host to proxy.
+        """
+        self._host = host
+        self._port = port
+        self._listener = None
+        self._factory = None
+
+    def startService(self):
+        super(ProxyService, self).startService()
+        self._factory = Factory()
+        self._factory.protocol = _FrontendProtocol
+        self._factory.blocked = False
+        self._factory.connections = 0
+        self._factory.backend = TCP4ClientEndpoint(
+            reactor, self._host, self._port)
+
+        self._listener = reactor.listenTCP(0, self._factory)
+
+    def stopService(self):
+        super(ProxyService, self).startService()
+        self._listener.stopListening()
+
+    def block(self):
+        """Drop all packets on the floor."""
+        self._factory.blocked = True
+
+    def unblock(self):
+        """Let packets flow again."""
+        self._factory.blocked = False
+
+    @property
+    def port(self):
+        """Get the frontend port of the proxy."""
+        return self._listener.getHost().port
+
+    @property
+    def connections(self):
+        """Get the number of frontend connections created so far."""
+        return self._factory.connections
+
+
+class _FrontendProtocol(Protocol):
+
+    def connectionMade(self):
+        self.factory.connections += 1
+        self.buffer = ""  # Pending writes
+        self.backend = None  # Backend protocol
+        factory = Factory()
+        factory.protocol = _BackendProtocol
+        factory.frontend = self
+
+        deferred = self.factory.backend.connect(factory)
+        deferred.addCallback(self._backendConnected)
+
+    def connectionLost(self, reason):
+        self.backend.transport.loseConnection()
+
+    def dataReceived(self, data):
+        if self.factory.blocked:
+            return
+        if self.backend:
+            self.backend.transport.write(data)
+        else:
+            self.buffer += data
+
+    def _backendConnected(self, backend):
+        self.backend = backend
+        self.dataReceived(self.buffer)
+
+
+class _BackendProtocol(Protocol):
+
+    def dataReceived(self, data):
+        if self.factory.frontend.factory.blocked:
+            return
+        self.factory.frontend.transport.write(data)
