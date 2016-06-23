@@ -29,7 +29,7 @@ setup(
         ],
     extras_require=dict(
         test=[
-            'rabbitfixture',
+            'rabbitfixture >= 0.3.7',
             'testresources >= 0.2.4_r58',
             'testtools',
             'python-subunit',

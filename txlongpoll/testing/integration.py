@@ -1,6 +1,5 @@
 # Copyright 2005-2011 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
-import sys
 
 from rabbitfixture.server import RabbitServer
 from testresources import (
@@ -29,6 +28,7 @@ from twisted.internet.endpoints import (
 from twisted.application.service import Service
 from txamqp.client import Closed
 from txlongpoll.client import AMQFactory
+from txlongpoll.testing.unit import UnitTest
 
 
 class QueueWrapper(object):
@@ -69,7 +69,7 @@ class RabbitServerWithoutReset(RabbitServer):
         """
 
 
-class IntegrationTest(ResourcedTestCase, TestCase):
+class IntegrationTest(UnitTest):
 
     run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
         timeout=10)

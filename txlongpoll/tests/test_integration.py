@@ -35,6 +35,7 @@ from txlongpoll.notification import (
     NotFound,
     Timeout,
 )
+from txlongpoll.client import AMQP0_8_SPEC_PATH
 from txlongpoll.frontend import DeprecatedQueueManager
 from txlongpoll.testing.integration import (
     IntegrationTest,
@@ -53,12 +54,13 @@ class NotificationSourceIntegrationTest(IntegrationTest):
             reactor, self.rabbit.config.hostname, self.rabbit.config.port,
             username="guest", password="guest", heartbeat=1)
         self.policy = backoffPolicy(initialDelay=0)
+        self.factory = AMQFactory(spec=AMQP0_8_SPEC_PATH)
         self.service = ClientService(
-            self.endpoint, AMQFactory(), retryPolicy=self.policy)
+            self.endpoint, self.factory, retryPolicy=self.policy)
         self.connector = NotificationConnector(self.service)
         self.source = NotificationSource(self.connector)
 
-        self.client = yield self.endpoint.connect(AMQFactory())
+        self.client = yield self.endpoint.connect(self.factory)
         self.channel = yield self.client.channel(1)
         yield self.channel.channel_open()
         yield self.channel.queue_declare(queue="uuid")
@@ -176,7 +178,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the restart has
         # destroyed it.
-        self.client = yield self.endpoint.connect(AMQFactory())
+        self.client = yield self.endpoint.connect(self.factory)
         self.channel = yield self.client.channel(1)
         yield self.channel.channel_open()
         yield self.channel.queue_declare(queue="uuid")
@@ -213,7 +215,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the crash has
         # destroyed it.
-        self.client = yield self.endpoint.connect(AMQFactory())
+        self.client = yield self.endpoint.connect(self.factory)
         self.channel = yield self.client.channel(1)
         yield self.channel.channel_open()
         yield self.channel.queue_declare(queue="uuid")
@@ -254,7 +256,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
 
         # Get a new channel and re-declare the queue, since the restart has
         # destroyed it.
-        self.client = yield self.endpoint.connect(AMQFactory())
+        self.client = yield self.endpoint.connect(self.factory)
         self.channel = yield self.client.channel(1)
         yield self.channel.channel_open()
         yield self.channel.queue_declare(queue="uuid")
@@ -282,7 +284,7 @@ class NotificationSourceIntegrationTest(IntegrationTest):
         self.addCleanup(proxy.stopService)
         self.endpoint._port = proxy.port
         self.service = ClientService(
-            self.endpoint, AMQFactory(), retryPolicy=self.policy)
+            self.endpoint, self.factory, retryPolicy=self.policy)
         self.connector._service = self.service
         self.service.startService()
 
