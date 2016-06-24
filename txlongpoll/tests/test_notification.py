@@ -12,6 +12,8 @@ from testtools.twistedsupport import (
     succeeded,
     failed,
 )
+# XXX This testtools API should probably be public, see #1589657.
+from testtools.twistedsupport._deferred import extract_result
 
 from twisted.internet.task import Clock
 from twisted.logger import Logger
@@ -25,6 +27,7 @@ from txlongpoll.notification import (
     NotificationSource,
     Timeout,
     NotFound,
+    Bounced,
 )
 from txlongpoll.testing.unit import (
     FakeConnector,
@@ -280,6 +283,83 @@ class NotificationSourceTest(TestCase):
         channel.deliver("foo", consumer_tag='uuid2.1', delivery_tag=1)
         channel.basic_cancel_ok(consumer_tag="uuid2.1")
         self.assertThat(deferred2, fires_with_payload("foo"))
+
+    def test_notification_ack(self):
+        """
+        Calling Notification.ack() acknowledges a notification.
+        """
+        deferred = self.source.get("uuid", 1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid.1")
+        channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid.1")
+        notification = extract_result(deferred)
+        self.connector.transport.outgoing.clear()
+        notification.ack()
+        [frame] = self.connector.transport.outgoing[1]
+        self.assertEqual("ack", frame.payload.method.name)
+        self.assertEqual((1, False), frame.payload.args)
+
+    def test_notification_ack_is_serialized(self):
+        """
+        Calls to Notification.ack() are serialized, so they don't get spurious
+        errors from unrelated channel commands.
+        """
+        deferred = self.source.get("uuid1", 1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        channel.deliver("foo", consumer_tag='uuid1.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+        notification = extract_result(deferred)
+
+        # Simulate a concurrent get() call locking the channel during its
+        # basic-consume.
+        self.source.get("uuid2", 1)
+
+        # Calling Notification.ack() now will not result in any outgoing frame,
+        # since the call will wait for the basic-consume above to complete.
+        self.connector.transport.outgoing.clear()
+        notification.ack()
+        self.assertEqual({}, self.connector.transport.outgoing)
+
+        # As soon as the channel lock is released, the frame is sent.
+        channel.basic_consume_ok(consumer_tag="uuid2.1")
+        [frame] = self.connector.transport.outgoing[1]
+        self.assertEqual("ack", frame.payload.method.name)
+        self.assertEqual((1, False), frame.payload.args)
+
+    def test_notification_reject(self):
+        """
+        Calling Notification.reject() rejects a notification.
+        """
+        deferred = self.source.get("uuid", 1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid.1")
+        channel.deliver("foo", consumer_tag='uuid.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid.1")
+        notification = extract_result(deferred)
+        self.connector.transport.outgoing.clear()
+        notification.reject()
+        [frame] = self.connector.transport.outgoing[1]
+        self.assertEqual("reject", frame.payload.method.name)
+        self.assertEqual((1, True), frame.payload.args)
+
+    def test_notification_bounced(self):
+        """
+        If an error happens while ack'ing a Notification, a Bounced exception
+        is raised.
+        """
+        deferred = self.source.get("uuid1", 1)
+        channel = self.connector.transport.channel(1)
+        channel.basic_consume_ok(consumer_tag="uuid1.1")
+        channel.deliver("foo", consumer_tag='uuid1.1', delivery_tag=1)
+        channel.basic_cancel_ok(consumer_tag="uuid1.1")
+        notification = extract_result(deferred)
+
+        # Simulate the broker shutting down.
+        channel.connection_close(reply_code=320, reply_text="shutdown")
+
+        self.assertRaises(Bounced, extract_result, notification.ack())
 
 
 def fires_with_channel(id):
