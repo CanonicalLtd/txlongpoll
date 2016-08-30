@@ -47,11 +47,8 @@ class RabbitServerWithoutReset(RabbitServer):
 
     def setUp(self):
         # Print RabbitMQ log on errors. Useful for debugging Travis failures.
-        from fixtures import (
-            EnvironmentVariableFixture,
-        )
-        self.useFixture(EnvironmentVariableFixture(
-            "RABBITMQ_ENABLED_PLUGINS_FILE", "/dev/null"))
+        import os
+        os.environ["RABBITMQ_ENABLED_PLUGINS_FILE"] = "/dev/null"
         try:
             super(RabbitServerWithoutReset, self).setUp()
         except Exception as error:
