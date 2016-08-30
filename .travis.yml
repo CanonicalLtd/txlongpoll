@@ -1,6 +1,8 @@
 sudo: required
 dist: trusty
-install:
+services:
+  - rabbitmq
+before_script:
     - sudo rabbitmq-plugins list
     - sudo rabbitmq-plugins disable rabbitmq_management
 script: make check
