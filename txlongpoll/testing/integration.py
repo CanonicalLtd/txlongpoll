@@ -2,11 +2,7 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from rabbitfixture.server import RabbitServer
-from testresources import (
-    FixtureResource,
-    ResourcedTestCase,
-    )
-from testtools import TestCase
+from testresources import FixtureResource
 from testtools.content import Content
 from testtools.content_type import UTF8_TEXT
 from testtools.deferredruntest import (
@@ -51,6 +47,11 @@ class RabbitServerWithoutReset(RabbitServer):
 
     def setUp(self):
         # Print RabbitMQ log on errors. Useful for debugging Travis failures.
+        from fixtures import (
+            EnvironmentVariableFixture,
+        )
+        self.useFixture(EnvironmentVariableFixture(
+            "RABBITMQ_ENABLED_PLUGINS_FILE", "/dev/null"))
         try:
             super(RabbitServerWithoutReset, self).setUp()
         except Exception as error:
